@@ -673,22 +673,34 @@ function viewMix(){
   const r = state.recipe; const t = TYPES[r.typeId]; const R = evaluate(r);
   const rows = r.items.map((it,idx)=>{ const g=ING[it.id]; if(!g) return '';
     return `<div class="irow" data-row="${esc(it.id)}"><span class="dot ${(ROLE[g.r]||ROLE.etc).g}"></span><button class="iname" data-act="open-ing" data-id="${esc(g.ko)}" data-ctx="recipe"><span>${esc(g.ko)}</span><small>${ROLE[g.r].n}</small></button><input type="range" id="sl-${idx}" min="0" max="${sliderMax(g)}" step="0.1" value="${it.pct}" data-slider="${esc(it.id)}" aria-label="${esc(g.ko)} 비율"><div class="pctwrap"><input type="number" inputmode="decimal" min="0" max="100" step="0.1" value="${fmt(it.pct)}" data-pctin="${esc(it.id)}" aria-label="${esc(g.ko)} 비율 직접 입력"><span>%</span></div><button class="iconbtn sm del" data-act="remove-ing" data-id="${esc(it.id)}" aria-label="${esc(g.ko)} 빼기">${ic('x','s')}</button></div>`; }).join('');
-  const topWarn = R.cautions.filter(c=>c.lv!=='info').slice(0,3);
   return topbar(`${t.name} 배합`, 'type', `<button class="iconbtn sm" data-act="undo" ${state.hist.length?'':'disabled'} aria-label="되돌리기" title="되돌리기">${ic('undo','s')}</button><button class="iconbtn sm" data-act="redo" ${state.redo.length?'':'disabled'} aria-label="다시하기" title="다시하기">${ic('redo','s')}</button><button class="btn text" data-act="save-recipe">저장</button>`) + `<div class="mix-grid"><div class="stack">
     <div class="row" style="flex-wrap:wrap"><span class="chip">${esc(CATS.find(c=>c.id===t.cat).name)} <span class="muted">›</span> ${esc(t.name)}</span><label class="chip" style="cursor:pointer"><input type="checkbox" id="autoBal" ${r.auto?'checked':''} style="accent-color:var(--primary);margin:0"> 정제수로 100% 맞추기</label></div>
     <div class="card beaker-card" id="beakerBox">${beakerInner(R)}</div>
     <div class="grid2"><button class="btn tonal" data-act="recommend" ${r.items.length?'':'disabled'}>${ic('wand','s')} 추천 비율 맞추기</button><button class="btn outl" data-act="ranges">${ic('info','s')} 권장 범위</button></div>
-    <div class="stack" id="warnBox" style="gap:8px">${topWarn.map(c=>alertHTML(c.lv,c.t,c.x)).join('')}</div>
+    <div id="warnBox">${warnStripHTML(R)}</div>
     <div class="section-title"><h2 class="h2">선택한 성분 <span class="muted" style="font-weight:500">${r.items.length}</span> <span class="xs muted" style="font-weight:400">· 숫자를 눌러 직접 입력</span></h2><button class="btn text fab-add" data-act="open-palette">${ic('plus','s')} 성분 추가</button></div>
     <div id="rows">${rows || `<div class="empty">비커가 비어 있어요. 「성분 추가」로 시작하세요.</div>`}</div>
     <button class="btn lg wide" data-act="nav" data-to="report" ${r.items.length?'':'disabled'}>${ic('leaf','s')} 효능·부작용 리포트 보기</button>
   </div><div class="palette-host" id="paletteHost">${isDesktop()?paletteHTML():''}</div></div>`;
 }
+function warnStripHTML(R){
+  const cs=R.cautions.filter(c=>c.lv!=='info');
+  if (!cs.length) return `<button class="status-strip ok" data-act="warn-all" aria-label="확인 사항 없음">${ic('check','s')}<span class="t"><b>확인 사항 없음</b> — 지금 배합은 규칙에 걸리는 게 없어요.</span>${ic('chev','xs')}</button>`;
+  const c=cs[0]; const infos=R.cautions.length-cs.length;
+  return `<button class="status-strip ${c.lv}" data-act="warn-all" aria-label="확인 사항 ${cs.length}개 보기">${ic('warn','s')}<span class="t"><b>${esc(c.t)}</b> — ${esc(c.x)}</span>${cs.length>1?`<span class="cnt">+${cs.length-1}</span>`:(infos?`<span class="cnt">참고 ${infos}</span>`:'')}${ic('chev','xs')}</button>`;
+}
+function warnAllHTML(){
+  const R=evaluate(state.recipe); const cs=R.cautions;
+  return `<div class="between" style="align-items:flex-start"><div><h2 class="h2" style="font-size:18px">확인 사항 ${cs.filter(c=>c.lv!=='info').length}개</h2><p class="small muted">비율을 바꾸면 바로 다시 계산돼요.</p></div><button class="iconbtn sm" data-act="close-sheets" aria-label="닫기">${ic('x','s')}</button></div>
+  ${cs.length?`<div class="stack" style="gap:8px">${cs.map(c=>alertHTML(c.lv,c.t,c.x)).join('')}</div>`:alertHTML('ok','','지금 배합은 규칙에 걸리는 게 없어요.')}
+  ${R.compat.length?`<div class="stack" style="gap:6px;border-top:1px solid var(--line);padding-top:10px"><b class="small">잘 된 점</b>${R.compat.map(c=>`<p class="small row" style="gap:6px">${ic('check','xs')} ${esc(c.text)}</p>`).join('')}</div>`:''}
+  <div class="sheet-actions" style="grid-template-columns:1fr"><button class="btn tonal" data-act="close-sheets">닫기</button></div>`;
+}
 function legendHTML(R){
   const g=R.groups; const diff=R.total-100;
-  const rows = ['water','oil','act','surf','other'].filter(k=>g[k]>0).map(k=>`<div class="between"><span class="row" style="gap:6px"><span class="dot ${k}"></span><span class="muted">${GROUPN[k]}</span></span><strong class="num">${fmt(g[k])}%</strong></div>`).join('');
+  const rows = ['water','oil','act','surf','other'].map(k=>`<div class="between ${g[k]>0?'':'zero'}"><span class="row" style="gap:6px"><span class="dot ${k}"></span><span class="muted">${GROUPN[k]}</span></span><strong class="num">${fmt(g[k])}%</strong></div>`).join('');
   const st = Math.abs(diff)<=0.5 ? ['ok','check','합계 100%'] : diff>0 ? ['bad','warn',`합계 ${fmt(R.total)}% · ${fmt(diff)}% 초과`] : ['warn','warn',`합계 ${fmt(R.total)}% · ${fmt(-diff)}% 부족`];
-  return `<div class="legend">${rows||'<span class="muted">아직 성분이 없어요</span>'}<div class="gauge ${st[0]}">${ic(st[1],'s')}${st[2]}</div></div>`;
+  return `<div class="legend">${rows}<div class="gauge ${st[0]}">${ic(st[1],'s')}${st[2]}</div></div>`;
 }
 function beakerInner(R){ return beakerSVG(R.groups,R.total)+legendHTML(R); }
 const PAL_ROLES = [['all','전체'],['nat','천연 원료'],['water','수상·보습'],['oil','오일·유화'],['act','활성'],['surf','세정'],['pres','보존'],['frag','향·색']];
@@ -716,7 +728,7 @@ function patchMix(){
   r.items.forEach(it=>{ const p=document.querySelector(`[data-pctin="${CSS.escape(it.id)}"]`); if(p && document.activeElement!==p) p.value=fmt(it.pct); const s=document.querySelector(`[data-slider="${CSS.escape(it.id)}"]`); if(s && Math.abs(parseFloat(s.value)-it.pct)>0.001) s.value=it.pct; });
   const u=document.querySelector('[data-act="undo"]'); if(u) u.disabled=!state.hist.length; const rd=document.querySelector('[data-act="redo"]'); if(rd) rd.disabled=!state.redo.length;
   const b=$('#beakerBox'); if(b){ const L=layerGeom(R.groups,R.total); const rects=b.querySelectorAll('rect[data-k]'); if(rects.length){ rects.forEach(r=>{ const g=L[r.dataset.k]; r.style.y=g.y+'px'; r.style.height=g.h+'px'; }); const lg=b.querySelector('.legend'); if(lg) lg.outerHTML=legendHTML(R); } else b.innerHTML=beakerInner(R); }
-  const w=$('#warnBox'); if(w) w.innerHTML=R.cautions.filter(c=>c.lv!=='info').slice(0,3).map(c=>alertHTML(c.lv,c.t,c.x)).join('');
+  const w=$('#warnBox'); if(w){ const html=warnStripHTML(R); if (w.innerHTML!==html) w.innerHTML=html; }
 }
 
 // ===== 화면: 리포트 =====
@@ -1341,6 +1353,7 @@ document.addEventListener('click', e=>{
     case 'redo': restoreHist(state.redo, state.hist); break;
     case 'recommend': closeSheets(); recommendMix(); break;
     case 'ranges': openInfoSheet(rangesHTML()); break;
+    case 'warn-all': openInfoSheet(warnAllHTML()); break;
     case 'swap-ing': { const from=d.from, to=d.to; const r=state.recipe; if(!r||!ING[to]) break; const it=r.items.find(i=>i.id===from); if(it){ pushHist(); if(r.items.some(i=>i.id===to)){ r.items=r.items.filter(i=>i!==it); } else { it.id=to; const mx=ING[to].mx; if(mx!=null&&mx>=0.01&&it.pct>mx) it.pct=mx; } balance(r); } closeSheets(); render(); toast(`${from} → ${to}(으)로 바꿨어요.`); break; }
     case 'diy-batch': state.diyBatch=+d.v; state.diyOpen=true; render(); break;
     case 'copy-inci': copyText(inciText(state.recipe)); break;
@@ -1394,7 +1407,7 @@ document.addEventListener('click', e=>{
 });
 document.addEventListener('input', e=>{
   const t=e.target;
-  if (t.matches('[data-slider]') && state.recipe){ const id=t.dataset.slider; if(state._dragId!==id){ pushHist(); state._dragId=id; } const v=applyPct(id, t.value); if (Math.abs(parseFloat(t.value)-v)>0.001) t.value=v; patchMix(); }
+  if (t.matches('[data-slider]') && state.recipe){ const id=t.dataset.slider; if(state._dragId!==id){ pushHist(); state._dragId=id; } const v=applyPct(id, t.value); if (Math.abs(parseFloat(t.value)-v)>0.001) t.value=v; const row=t.closest('.irow'); const y0=row?row.getBoundingClientRect().top:0; patchMix(); if(row){ const dy=row.getBoundingClientRect().top-y0; if (Math.abs(dy)>0.5) window.scrollBy(0, dy); } }
   else if (t.id==='palQ'){ state.palQ=t.value; refreshPalette(); }
   else if (t.id==='avoidQ'){ state.avoidQ=t.value; const pos=t.selectionStart; refreshAvoidSheet(); const q=$('#avoidQ'); if(q){ q.focus(); try{ q.setSelectionRange(pos,pos); }catch(e){} } }
   else if (t.id==='dictQ'){ state.dictQ=t.value; const l=$('#dictList'); if(l){ const pos=t.selectionStart; render(); const q=$('#dictQ'); if(q){ q.focus(); try{ q.setSelectionRange(pos,pos); }catch(e){} } } }
@@ -1406,7 +1419,7 @@ document.addEventListener('input', e=>{
 document.addEventListener('change', e=>{
   const t=e.target;
   if (t.matches('[data-slider]')){ state._dragId=null; }
-  else if (t.matches('[data-pctin]') && state.recipe){ const it=state.recipe.items.find(i=>i.id===t.dataset.pctin); if(!it) return; if (fmt(it.pct)===fmt(+t.value||0)){ t.value=fmt(it.pct); return; } pushHist(); const before=Math.round((+t.value||0)*10)/10; const v=applyPct(t.dataset.pctin, t.value); t.value=fmt(v); patchMix(); if (before>v+0.001) toast(`합계 100%를 넘지 않게 ${fmt(v)}%까지만 넣었어요.`); }
+  else if (t.matches('[data-pctin]') && state.recipe){ const it=state.recipe.items.find(i=>i.id===t.dataset.pctin); if(!it) return; if (fmt(it.pct)===fmt(+t.value||0)){ t.value=fmt(it.pct); return; } pushHist(); const before=Math.round((+t.value||0)*10)/10; const v=applyPct(t.dataset.pctin, t.value); t.value=fmt(v); const row=t.closest('.irow'); const y0=row?row.getBoundingClientRect().top:0; patchMix(); if(row){ const dy=row.getBoundingClientRect().top-y0; if (Math.abs(dy)>0.5) window.scrollBy(0, dy); } if (before>v+0.001) toast(`합계 100%를 넘지 않게 ${fmt(v)}%까지만 넣었어요.`); }
   else if (t.matches('#diyDetails')){ state.diyOpen=t.open; }
   if (t.id==='autoBal' && state.recipe){ state.recipe.auto=t.checked; balance(state.recipe); patchMix(); }
   else if (t.id==='photoIn' || t.classList.contains('photo-in')){ const f=t.files&&t.files[0]; if(f) runPhoto(f); }
