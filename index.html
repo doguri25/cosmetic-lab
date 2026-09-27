@@ -79,7 +79,7 @@ html{scroll-behavior:smooth}
 .rail{display:none}
 main{flex:1;width:100%;max-width:640px;margin:0 auto;padding:0 16px calc(104px + env(safe-area-inset-bottom,0px))}
 @media (min-width:900px){
-  .app{display:grid;grid-template-columns:88px minmax(0,1fr)}
+  .app{display:grid;grid-template-columns:96px minmax(0,1fr)}
   .rail{display:flex;flex-direction:column;align-items:center;gap:6px;padding:20px 0;background:var(--surface2);position:sticky;top:0;height:100vh}
   main{max-width:1120px;padding:0 32px 48px}
   .bottomnav{display:none!important}
@@ -459,6 +459,25 @@ details .exp,details .tbl{animation:fadeUp .3s both}
 .eval-cols{display:grid;grid-template-columns:1fr;gap:12px;border-top:1px solid var(--line);padding-top:10px}
 @media (min-width:600px){.eval-cols{grid-template-columns:1fr 1fr}.eval-axes{grid-template-columns:1fr 1fr;column-gap:20px}}
 @media (max-width:420px){.eval-ax{grid-template-columns:70px auto;grid-template-rows:auto auto}.eval-ax .w{grid-column:1/-1;margin-top:-2px}}
+/* PC: 화면이 넓어지는 만큼 글자·그림·여백을 함께 키움 (--z 배율, vh 기준 높이는 배율로 나눠 보정) */
+:root{--z:1}
+@supports (zoom:1.1){
+  @media (min-width:900px){ :root{--z:1.12} }
+  @media (min-width:1280px){ :root{--z:1.22} }
+  @media (min-width:1600px){ :root{--z:1.32} }
+  @media (min-width:900px){
+    main,.sheet,.consent .box,.toast{zoom:var(--z)}
+    .sheet{max-height:calc(80vh / var(--z))}
+    .sheet .palette{max-height:calc(70vh / var(--z))}
+    .palette-host .palette{max-height:calc((100vh - 100px) / var(--z))}
+    .avoid-list{max-height:calc(40vh / var(--z))}
+    .rail .navitem{font-size:13px;width:80px}
+    .rail .navitem .pill{width:60px;height:36px;border-radius:18px}
+    .rail .icon{width:26px;height:26px}
+    .rail .logo{width:46px;height:46px;border-radius:16px}
+  }
+  @media (min-width:1280px){ .rail .navitem{font-size:14px} .rail .icon{width:28px;height:28px} .rail .navitem .pill{width:64px;height:38px;border-radius:19px} }
+}
 </style>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
