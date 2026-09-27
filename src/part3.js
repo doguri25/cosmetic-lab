@@ -715,6 +715,7 @@ function renderBanners(show){
 function hideBanners(){ const box=$('#mixBanners'); if(!box){ MIX_AL.visible=false; return; } box.querySelectorAll('.banner').forEach(el=>el.classList.add('out')); setTimeout(()=>renderBanners(false), 230); }
 function scheduleBannerHide(ms=4500){ clearTimeout(MIX_AL.timer); if (MIX_AL.dragging) return; MIX_AL.timer=setTimeout(hideBanners, ms); }
 function syncMixAlerts(R, opts={}){
+  if (MIX_AL.dragging && !opts.force && !opts.silent) return; // 드래그 중에는 띄우지 않고, 손을 뗄 때 보여 줌
   const cs=R.cautions.filter(c=>c.lv!=='info'); const now=Date.now(); let changed=false;
   const keys=new Set(cs.map(cautionKey));
   for (const [k,v] of MIX_AL.shown){ if(!keys.has(k)){ MIX_AL.shown.delete(k); changed=true; if(!opts.silent){ const f={t:v.t,at:now}; MIX_AL.flashes.push(f); setTimeout(()=>{ MIX_AL.flashes=MIX_AL.flashes.filter(x=>x!==f); if (MIX_AL.visible) renderBanners(true); }, 2200); } } }
@@ -1446,7 +1447,7 @@ document.addEventListener('click', e=>{
 });
 document.addEventListener('input', e=>{
   const t=e.target;
-  if (t.matches('[data-slider]') && state.recipe){ const id=t.dataset.slider; MIX_AL.dragging=true; clearTimeout(MIX_AL.timer); if(state._dragId!==id){ pushHist(); state._dragId=id; } const v=applyPct(id, t.value); if (Math.abs(parseFloat(t.value)-v)>0.001) t.value=v; const row=t.closest('.irow'); const y0=row?row.getBoundingClientRect().top:0; patchMix(); if(row){ const dy=row.getBoundingClientRect().top-y0; if (Math.abs(dy)>0.5) window.scrollBy(0, dy); } }
+  if (t.matches('[data-slider]') && state.recipe){ const id=t.dataset.slider; MIX_AL.dragging=true; clearTimeout(MIX_AL.timer); if(state._dragId!==id){ pushHist(); state._dragId=id; if (MIX_AL.visible) hideBanners(); } const v=applyPct(id, t.value); if (Math.abs(parseFloat(t.value)-v)>0.001) t.value=v; const row=t.closest('.irow'); const y0=row?row.getBoundingClientRect().top:0; patchMix(); if(row){ const dy=row.getBoundingClientRect().top-y0; if (Math.abs(dy)>0.5) window.scrollBy(0, dy); } }
   else if (t.id==='palQ'){ state.palQ=t.value; refreshPalette(); }
   else if (t.id==='avoidQ'){ state.avoidQ=t.value; const pos=t.selectionStart; refreshAvoidSheet(); const q=$('#avoidQ'); if(q){ q.focus(); try{ q.setSelectionRange(pos,pos); }catch(e){} } }
   else if (t.id==='dictQ'){ state.dictQ=t.value; const l=$('#dictList'); if(l){ const pos=t.selectionStart; render(); const q=$('#dictQ'); if(q){ q.focus(); try{ q.setSelectionRange(pos,pos); }catch(e){} } } }
@@ -1457,7 +1458,7 @@ document.addEventListener('input', e=>{
 });
 document.addEventListener('change', e=>{
   const t=e.target;
-  if (t.matches('[data-slider]')){ state._dragId=null; MIX_AL.dragging=false; scheduleBannerHide(); }
+  if (t.matches('[data-slider]')){ state._dragId=null; MIX_AL.dragging=false; if (state.recipe && state.screen==='mix') syncMixAlerts(evaluate(state.recipe), {force:true}); }
   else if (t.matches('[data-pctin]') && state.recipe){ const it=state.recipe.items.find(i=>i.id===t.dataset.pctin); if(!it) return; if (fmt(it.pct)===fmt(+t.value||0)){ t.value=fmt(it.pct); return; } pushHist(); const before=Math.round((+t.value||0)*10)/10; const v=applyPct(t.dataset.pctin, t.value); t.value=fmt(v); const row=t.closest('.irow'); const y0=row?row.getBoundingClientRect().top:0; patchMix(); if(row){ const dy=row.getBoundingClientRect().top-y0; if (Math.abs(dy)>0.5) window.scrollBy(0, dy); } if (before>v+0.001) toast(`합계 100%를 넘지 않게 ${fmt(v)}%까지만 넣었어요.`); }
   else if (t.matches('#diyDetails')){ state.diyOpen=t.open; }
   if (t.id==='autoBal' && state.recipe){ state.recipe.auto=t.checked; balance(state.recipe); patchMix(); }
