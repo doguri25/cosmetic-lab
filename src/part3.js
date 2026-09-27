@@ -20,10 +20,11 @@ const state = {
   palRole:'all', palQ:'',
   sample:null, limits:null, sampleReady:false, downloads:null, perms:null, aiState:'unknown',
   aiReport:{}, aiSimilar:{}, aiBusy:{}, ctl:{},
-  skin: store.get('lab.skin',''), avoid: Object.assign({groups:[], ids:[]}, store.get('lab.avoid', {})), avoidQ:'', dictRole:'all', dictGrade:'all', dictQ:'',
+  skin: store.get('lab.skin',''), avoid: Object.assign({groups:[], ids:[]}, store.get('lab.avoid', {})), avoidQ:'', dictRole:'all', dictGrade:'all', dictQ:'', dictFn:'all', dictOrigin:'all',
+  routine: Object.assign({am:[], pm:[]}, store.get('lab.routine', {})), routineSlot:'am', compare:{on:false, sel:[]},
   cloud:{db:null,user:null,uid:null,ref:null,ready:false,synced:false}, gallery:{items:null,busy:false,names:{}}, savedTab:'mine',
   hist:[], redo:[], _dragId:null, diyBatch:100, diyOpen:false,
-  cfg: Object.assign({src:'', provider:'gemini', model:{}, remember:true}, store.get('lab.cfg', {})),
+  cfg: Object.assign({src:'', provider:'gemini', model:{}, remember:true, fontScale:'normal', theme:'system'}, store.get('lab.cfg', {})),
   keys:{}, showKey:false, modelList:{}, modelBusy:false, aiTest:null,
 };
 // ===== AI 공급자 (내장 claude.ai / 개인 API 키) =====
@@ -40,6 +41,8 @@ function aiMode(){ if (aiSrc()==='builtin') return state.sample ? 'builtin' : nu
 const aiOn = () => !!aiMode();
 const curModel = () => { const m=state.cfg.model[state.cfg.provider]; return (m && m!=='__custom') ? m : PROVIDERS[state.cfg.provider].def; };
 function saveCfg(){ store.set('lab.cfg', state.cfg); }
+function applyScale(){ const w=innerWidth; const z = w>=1600?1.32: w>=1280?1.22: w>=900?1.12:1; const uz={small:.9,normal:1,large:1.12}[state.cfg.fontScale]||1; document.documentElement.style.setProperty('--zoom', (z*uz).toFixed(3)); }
+function applyTheme(){ const t=state.cfg.theme||'system'; if (t==='system') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme=t; }
 function loadKeys(){ let k = store.get('lab.keys', null); if (!k){ try{ const s=sessionStorage.getItem('lab.keys'); k = s?JSON.parse(s):null; }catch(e){} } state.keys = (k && typeof k==='object') ? k : {}; }
 function saveKeys(){ try{ if (state.cfg.remember){ store.set('lab.keys', state.keys); sessionStorage.removeItem('lab.keys'); } else { localStorage.removeItem('lab.keys'); sessionStorage.setItem('lab.keys', JSON.stringify(state.keys)); } }catch(e){} }
 loadKeys();
@@ -590,7 +593,11 @@ function settingsHTML(){
   <section class="set-sec"><div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn" data-act="set-test" ${key&&!t.busy?'':'disabled'}>${t.busy?`<span class="thinking"><i></i></span> 확인 중…`:`${ic('spark','s')} 연결 테스트`}</button><button class="btn text" data-act="set-clear" ${key?'':'disabled'}>${ic('trash','s')} 키 지우기</button></div>
     ${t.st==='ok'?alertHTML('ok','연결됨',t.msg):t.st==='err'?alertHTML('bad','실패',t.msg):''}
     <p class="xs muted">키는 이 기기의 브라우저에만 저장되고, 선택한 AI 서비스 서버로만 직접 전송돼요. 다른 곳으로는 보내지 않아요.</p></section>` : ''}
-  <section class="set-sec"><div class="set-h">앱</div><div class="between"><span class="small">버전</span><span class="badge">v1.8</span></div><div class="between"><span class="small">지금 AI 상태</span>${aiStatusBadge()}</div><div class="between"><span class="small">이용 안내·면책 고지</span><button class="btn text" data-act="consent-show" style="min-height:36px">다시 보기</button></div><p class="xs muted">배합·리포트·DIY 변환·성분 사전·용기 추천은 AI 없이도 항상 동작해요.</p></section>
+  <section class="set-sec"><div class="set-h">화면</div>
+    <div class="between" style="gap:10px"><span class="small">글자 크기</span><div class="seg" style="width:220px;height:36px">${[['small','작게'],['normal','보통'],['large','크게']].map(([k,n])=>`<button class="${(c.fontScale||'normal')===k?'sel':''}" data-act="set-font" data-v="${k}">${n}</button>`).join('')}</div></div>
+    <div class="between" style="gap:10px"><span class="small">테마</span><div class="seg" style="width:220px;height:36px">${[['system','시스템'],['light','밝게'],['dark','어둡게']].map(([k,n])=>`<button class="${(c.theme||'system')===k?'sel':''}" data-act="set-theme" data-v="${k}">${n}</button>`).join('')}</div></div>
+    <div class="between"><span class="small">배합 화면 안내 투어</span><button class="btn text" data-act="tour-start" style="min-height:36px">다시 보기</button></div></section>
+  <section class="set-sec"><div class="set-h">앱</div><div class="between"><span class="small">버전</span><span class="badge">v1.9</span></div><div class="between"><span class="small">지금 AI 상태</span>${aiStatusBadge()}</div><div class="between"><span class="small">이용 안내·면책 고지</span><button class="btn text" data-act="consent-show" style="min-height:36px">다시 보기</button></div><p class="xs muted">배합·리포트·DIY 변환·성분 사전·용기 추천은 AI 없이도 항상 동작해요.</p></section>
   <div class="sheet-actions" style="grid-template-columns:1fr"><button class="btn" data-act="close-sheets">완료</button></div>`;
 }
 function refreshSettings(){ const b=$('#sheetSettingsBody'); if(b) b.innerHTML=settingsHTML(); }
@@ -622,7 +629,7 @@ function alertHTML(lv, title, text){ const icon = lv==='ok'?'check':lv==='info'?
 // ===== 화면: 홈 =====
 function viewHome(){
   const recent = state.saved.slice(0,3);
-  return `<header class="topbar"><div class="row" style="gap:10px;flex:1;min-width:0"><div class="rail-logo" style="width:36px;height:36px;border-radius:12px;background:var(--primary);color:var(--on-primary);display:flex;align-items:center;justify-content:center;flex-shrink:0">${ic('flask','s')}</div><h1>내 화장품 연구소</h1></div>${aiMode()?`<span class="badge g0" title="AI 켜짐">${ic('spark','xs')} AI</span>`:''}<span class="badge">v1.8</span><button class="iconbtn" data-act="settings" aria-label="설정" title="설정" style="margin-right:-8px">${ic('gear')}</button></header>
+  return `<header class="topbar"><div class="row" style="gap:10px;flex:1;min-width:0"><div class="rail-logo" style="width:36px;height:36px;border-radius:12px;background:var(--primary);color:var(--on-primary);display:flex;align-items:center;justify-content:center;flex-shrink:0">${ic('flask','s')}</div><h1>내 화장품 연구소</h1></div>${aiMode()?`<span class="badge g0" title="AI 켜짐">${ic('spark','xs')} AI</span>`:''}<span class="badge">v1.9</span><button class="iconbtn" data-act="settings" aria-label="설정" title="설정" style="margin-right:-8px">${ic('gear')}</button></header>
   <div class="stack">
     <div><div class="lead">오늘은 무엇을<br>만들어 볼까요?</div><p class="muted small">성분을 배합해 보고, 산 화장품도 읽어 보세요.</p></div>
     <div class="grid2 big2">
@@ -639,12 +646,14 @@ function viewHome(){
 }
 function savedItem(s, i){
   const at = new Date(s.at); const when = `${at.getMonth()+1}/${at.getDate()}`;
+  const cmp = state.compare.on && state.screen==='saved'; const picked = cmp && state.compare.sel.includes(s.at);
+  const act = cmp ? `data-act="cmp-pick" data-at="${s.at}"` : `data-act="load-saved" data-i="${i}"`; const pickMark = cmp ? `<span class="chk ${picked?'on':''}">${picked?ic('check','xs'):''}</span>` : '';
   if (s.k==='recipe'){
     const t=TYPES[s.typeId]; const R=evaluate(s);
     const A=assess(s);
-    return `<button class="saved-item" data-act="load-saved" data-i="${i}"><div class="thumb">${containerSVG(s.pack, s.name)}</div><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px"><div class="nm">${esc(s.name)}</div><div class="wrap" style="gap:4px"><span class="badge">${esc(t.name)}</span><span class="badge ${A.letter[0]==='A'?'g0':A.letter==='B'?'g1':'g2'}" title="완성 제품 평가">평가 ${A.letter}</span>${gradeBadges(R.grade)}</div></div><span class="xs muted">${when}</span></button>`;
+    return `<button class="saved-item ${picked?'picked':''}" ${act}>${pickMark}<div class="thumb">${containerSVG(s.pack, s.name)}</div><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px"><div class="nm">${esc(s.name)}</div><div class="wrap" style="gap:4px"><span class="badge">${esc(t.name)}</span><span class="badge ${A.letter[0]==='A'?'g0':A.letter==='B'?'g1':'g2'}" title="완성 제품 평가">평가 ${A.letter}</span>${gradeBadges(R.grade)}</div></div><span class="xs muted">${when}</span></button>`;
   }
-  return `<button class="saved-item" data-act="load-saved" data-i="${i}"><div class="thumb">${ic('camera')}</div><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px"><div class="nm">${esc(s.name)}</div><div class="xs muted">성분표 분석 · ${s.n}개 성분</div></div><span class="xs muted">${when}</span></button>`;
+  return `<button class="saved-item ${picked?'picked':''}" ${act}>${pickMark}<div class="thumb">${ic('camera')}</div><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px"><div class="nm">${esc(s.name)}</div><div class="xs muted">성분표 분석 · ${s.n}개 성분</div></div><span class="xs muted">${when}</span></button>`;
 }
 
 const CAT_COLOR = {skin:'#3D6B4F',cleanse:'#2F5D8A',hairbody:'#B0562A',lipcolor:'#8A4B6B',mask:'#2A9D8F'};
@@ -923,6 +932,135 @@ async function runAIEval(){
   }catch(e){ if(e.text) state.aiEval[key]=soften(e.text)+'\n(중단됨)'; if(e.code!=='cancelled') toast(errMsg(e)); }
   state.aiBusy.eval=false; if(state.screen==='done') render();
 }
+// ===== 내 화장대 (루틴 궁합 검사) =====
+const ORDER_RANK = {foam:0,oil:0,micellar:0,bodywash:0,shampoo:0,treatment:0.5,washoff:0.5,toner:1,essence:2,sheet:2.5,lotion:3,bodylotion:3,cream:4,lipbalm:5,liptint:5,sun:6,cushion:7};
+const NAME_RANK = [[/클렌징|폼|워시|샴푸|세안|클렌저|비누/,0],[/트리트먼트|린스|컨디셔너|워시오프|팩/,0.5],[/토너|스킨|미스트|부스터|워터/,1],[/세럼|에센스|앰플|스팟/,2],[/시트|마스크/,2.5],[/로션|에멀전|에멀젼|플루이드/,3],[/크림|밤|버터/,4],[/립/,5],[/선|썬|UV|SPF|차단/i,6],[/쿠션|파운데이션|틴트|메이크업/,7]];
+function orderRank(p){ for (const [re,v] of NAME_RANK) if (re.test(p.name||'')) return v; return ORDER_RANK[p.S.guess] ?? 3; }
+function analysisProducts(){ return state.saved.filter(s=>s.k==='analysis').map(s=>{ const items=parseList(s.raw).map((n,i)=>({name:n,id:findIng(n),pos:i})); return {at:s.at,name:s.name,items,S:analysisSummary(items)}; }); }
+function routineSlot(slot){ const all=analysisProducts(); return (state.routine[slot]||[]).map(at=>all.find(p=>p.at===at)).filter(Boolean); }
+function saveRoutine(){ store.set('lab.routine', state.routine); persistCloud(); }
+const pNames = ps => ps.map(p=>`「${p.name}」`).join(', ');
+function routineCheck(prods, slot){
+  const issues=[]; const has=(p,re)=>p.items.some(i=>i.id&&re.test(i.id)); const hasId=(p,id)=>p.items.some(i=>i.id===id); const rinse=p=>!!(p.S.guess&&TYPES[p.S.guess]&&TYPES[p.S.guess].rinse);
+  const RET=/^레티|하이드록시피나콜론/, ACID=/글라이콜릭애씨드|락틱애씨드|살리실릭애씨드|만델릭애씨드|베타인살리실레이트|락토바이오닉|아젤라익애씨드|글루코노락톤/;
+  const ret=prods.filter(p=>has(p,RET)), acid=prods.filter(p=>has(p,ACID)), vitc=prods.filter(p=>hasId(p,'아스코빅애씨드')), nia=prods.filter(p=>hasId(p,'나이아신아마이드'));
+  const uv=prods.filter(p=>p.items.some(i=>i.id&&ING[i.id].r==='uv')), frag=prods.filter(p=>p.items.some(i=>i.id&&(ING[i.id].r==='frag'||ING[i.id].a25))), eth=prods.filter(p=>hasId(p,'에탄올'));
+  const cleansers=prods.filter(rinse), leave=prods.filter(p=>!rinse(p)); const avoided=prods.map(p=>({p,ids:p.S.avoided||[]})).filter(x=>x.ids.length);
+  if (ret.length && acid.length && (ret.length+acid.length>ret.filter(p=>acid.includes(p)).length)) issues.push({lv:'bad',t:'레티놀 + 산 성분',x:`${pNames(ret)}의 레티놀 계열과 ${pNames(acid)}의 각질 성분을 같은 루틴에 쓰면 자극이 커져요. 아침·저녁으로 나누거나 격일로 쓰세요.`});
+  if (acid.length>=2) issues.push({lv:'warn',t:`각질 성분 제품 ${acid.length}개`,x:`${pNames(acid)} — 각질 성분이 겹치면 장벽이 약해져요. 한 루틴엔 하나만 남기세요.`});
+  if (ret.length && vitc.length && !ret.some(p=>vitc.includes(p))) issues.push({lv:'warn',t:'레티놀 + 순수 비타민C',x:`${pNames(vitc)}의 비타민C는 아침, ${pNames(ret)}의 레티놀은 저녁으로 나누는 편이 무난해요.`});
+  if (slot==='am' && ret.length) issues.push({lv:'warn',t:'아침 루틴의 레티놀',x:`${pNames(ret)} — 레티놀 계열은 빛에 약하고 광과민이 있어 저녁에 쓰는 편이 좋아요. 아침에 쓴다면 자외선 차단제를 꼭 바르세요.`});
+  if (slot==='pm' && uv.length) issues.push({lv:'info',t:'저녁 루틴의 자외선 차단제',x:`${pNames(uv)} — 자외선 차단제는 아침 루틴의 마지막 단계에 쓰세요.`});
+  if (slot==='am' && !uv.length && leave.length) issues.push({lv:'info',t:'자외선 차단제가 없어요',x:'아침 루틴 마지막에 자외선 차단제를 더하면 미백·레티놀 성분의 효과를 지키고 자극을 줄여요.'});
+  if (frag.length>=2) issues.push({lv:state.skin==='sens'?'warn':'info',t:`향 성분 제품 ${frag.length}개`,x:`${pNames(frag)} — 향료·알레르기 유발성분이 여러 제품에 겹쳐요.${state.skin==='sens'?' 민감 피부라면 하나는 무향으로 바꿔 보세요.':''}`});
+  if (eth.length>=2) issues.push({lv:'info',t:`에탄올 제품 ${eth.length}개`,x:`${pNames(eth)} — 알코올이 겹치면 건조해질 수 있어요.`});
+  if (nia.length>=3) issues.push({lv:'info',t:`나이아신아마이드 제품 ${nia.length}개`,x:'총량이 많아지면 붉어지거나 따가울 수 있어요. 두 개 정도면 충분해요.'});
+  if (vitc.length && nia.length && !vitc.some(p=>nia.includes(p))) issues.push({lv:'info',t:'비타민C + 나이아신아마이드',x:'요즘은 함께 써도 대체로 괜찮다고 보지만, 따가우면 아침·저녁으로 나누세요.'});
+  if (cleansers.length>=2) issues.push({lv:'info',t:`세정 단계 ${cleansers.length}개`,x:`${pNames(cleansers)} — 세정을 여러 번 하면 장벽이 약해질 수 있어요.${slot==='am'?' 아침엔 물 세안이나 약산성 폼 하나로 충분해요.':''}`});
+  if (avoided.length) issues.push({lv:'warn',t:'피하는 성분 포함',x:avoided.map(x=>`${x.p.name}(${x.ids.join(', ')})`).join(' · ')});
+  const count={}; prods.forEach(p=>{ new Set(p.items.map(i=>i.id).filter(Boolean)).forEach(id=>{ (count[id]=count[id]||[]).push(p.name); }); });
+  const overlaps=Object.entries(count).filter(([id,ps])=>ps.length>=2 && id!=='정제수').map(([id,ps])=>({id,ps})).sort((a,b)=>(b.ps.length-a.ps.length)||((ING[b.id].g+(ING[b.id].a25?1:0))-(ING[a.id].g+(ING[a.id].a25?1:0)))).slice(0,10);
+  const order=[...prods].sort((a,b)=>(orderRank(a)-orderRank(b))||(a.items.length-b.items.length));
+  const lv = issues.some(i=>i.lv==='bad')?'bad':issues.some(i=>i.lv==='warn')?'warn':'ok';
+  const head = lv==='bad'?'조심해서 조합하세요':lv==='warn'?'확인할 점이 있어요':'무난한 조합이에요';
+  return {issues, overlaps, order, lv, head};
+}
+function routineHTML(){
+  const slot=state.routineSlot||'am'; const prods=routineSlot(slot); const all=analysisProducts();
+  const C=prods.length?routineCheck(prods,slot):null;
+  const slotN={am:'아침',pm:'저녁'}[slot];
+  return `<div class="seg two"><button class="${slot==='am'?'sel':''}" data-act="routine-slot" data-v="am">☀ 아침 루틴 <span class="muted">${(state.routine.am||[]).length}</span></button><button class="${slot==='pm'?'sel':''}" data-act="routine-slot" data-v="pm">☾ 저녁 루틴 <span class="muted">${(state.routine.pm||[]).length}</span></button></div>
+  <div class="card stack" style="gap:10px"><div class="between"><h2 class="h3">${slotN}에 쓰는 제품 <span class="muted" style="font-weight:500">${prods.length}</span></h2><button class="btn tonal sm" style="min-height:34px;padding:0 12px;font-size:13px" data-act="routine-pick" data-slot="${slot}">${ic('plus','xs')} 제품 추가</button></div>
+    ${prods.length ? `<ol class="routine-list">${C.order.map((p,i)=>{ const t=p.S.guess&&TYPES[p.S.guess]; const key=p.items.filter(x=>x.id&&['act','uv'].includes(ING[x.id].r)).slice(0,3); return `<li><span class="no">${i+1}</span><button class="info" data-act="routine-open" data-at="${p.at}"><b>${esc(p.name)}</b><small>${t?esc(t.name):esc(p.S.character)} · 성분 ${p.items.length}개${key.length?' · '+esc(key.map(x=>x.id).join(', ')):''}</small><span class="wrap" style="gap:3px;margin-top:2px">${gradeBadges(p.S.grade)}</span></button><button class="iconbtn sm" data-act="routine-remove" data-at="${p.at}" data-slot="${slot}" aria-label="빼기">${ic('x','s')}</button></li>`; }).join('')}</ol>
+    <p class="xs muted">순서는 제형이 가벼운 것부터(세정 → 토너 → 에센스 → 로션·크림 → 밤 → 자외선 차단제) 앱이 제안한 거예요.</p>` : `<div class="empty">${all.length?`「제품 추가」로 분석해 둔 제품을 ${slotN} 루틴에 넣어 보세요.`:'먼저 「분석하기」에서 쓰는 화장품의 전성분을 읽고 저장해 두면 여기서 고를 수 있어요.'}</div>${all.length?'':`<button class="btn tonal" data-act="nav" data-to="analyze">${ic('camera','s')} 분석하러 가기</button>`}`}
+  </div>
+  ${C ? `<div class="card stack" style="gap:10px"><div class="row" style="gap:10px"><span class="badge ${C.lv==='ok'?'g0':C.lv==='warn'?'g1':'g2'}" style="font-size:13px;padding:4px 10px">${ic(C.lv==='ok'?'check':'warn','xs')} ${C.head}</span><span class="xs muted">${prods.length}개 제품을 함께 썼을 때</span></div>
+    ${C.issues.length?C.issues.map(i=>alertHTML(i.lv,i.t,i.x)).join(''):alertHTML('ok','','제품 사이에 부딪히는 성분이 없어요.')}
+    <p class="xs muted">규칙: 레티놀+산, 산 성분 중복, 레티놀+비타민C, 시간대(레티놀은 저녁·자외선 차단제는 아침), 향·알코올·나이아신아마이드 누적, 세정 단계 수, 내 피하는 성분.</p></div>
+  <div class="card stack" style="gap:8px"><h3 class="h3">겹치는 성분</h3>${C.overlaps.length?`<div class="wrap">${C.overlaps.map(o=>`<span class="row" style="gap:4px">${ingChip(o.id)}<span class="badge">×${o.ps.length}</span></span>`).join('')}</div><p class="xs muted">같은 성분이 여러 제품에 들어 있어요. 기능 성분이 겹치면 농도가 더해지는 셈이라, 주의·경고 등급은 한 제품으로 줄여 보세요.</p>`:`<p class="small muted">정제수 말고는 겹치는 성분이 없어요.</p>`}</div>` : ''}
+  <p class="footnote">제품 사이 궁합은 성분 이름만으로 판단한 참고 정보예요. 실제 농도와 제형에 따라 달라지고, 피부 반응은 사람마다 달라요.</p>`;
+}
+function routinePickHTML(slot){
+  const all=analysisProducts(); const ids=new Set(state.routine[slot]||[]); const slotN={am:'아침',pm:'저녁'}[slot];
+  return `<div class="between"><div><h2 class="h2" style="font-size:18px">${slotN} 루틴에 넣을 제품</h2><p class="small muted">분석해 둔 제품 ${all.length}개 중에서 고르세요.</p></div><button class="iconbtn sm" data-act="close-sheets" aria-label="닫기">${ic('x','s')}</button></div>
+  ${all.length?`<div class="avoid-list">${all.map(p=>`<div class="prow"><button class="info" data-act="routine-toggle" data-at="${p.at}" data-slot="${slot}"><span class="chk ${ids.has(p.at)?'on':''}">${ids.has(p.at)?ic('check','xs'):''}</span><span class="t"><span class="n">${esc(p.name)}</span><small>${esc(p.S.character)} · 성분 ${p.items.length}개</small></span></button></div>`).join('')}</div>`:`<div class="empty">아직 분석해 둔 제품이 없어요.</div><button class="btn tonal" data-act="nav" data-to="analyze">${ic('camera','s')} 분석하러 가기</button>`}
+  <div class="sheet-actions" style="grid-template-columns:1fr"><button class="btn" data-act="close-sheets">완료</button></div>`;
+}
+function slotPickHTML(at){
+  return `<div class="between"><div><h2 class="h2" style="font-size:18px">언제 쓰는 제품인가요?</h2><p class="small muted">내 화장대에 넣어 두면 다른 제품과의 궁합을 확인할 수 있어요.</p></div><button class="iconbtn sm" data-act="close-sheets" aria-label="닫기">${ic('x','s')}</button></div>
+  <div class="stack" style="gap:8px"><button class="btn tonal" data-act="routine-put" data-at="${at}" data-slot="am">☀ 아침에 써요</button><button class="btn tonal" data-act="routine-put" data-at="${at}" data-slot="pm">☾ 저녁에 써요</button><button class="btn" data-act="routine-put" data-at="${at}" data-slot="both">아침·저녁 둘 다</button></div>`;
+}
+function ensureAnalysisSaved(){ const a=state.analysis; if(!a.items) return null; let s=state.saved.find(x=>x.k==='analysis'&&x.raw===a.raw); if(!s){ state.saved.unshift({k:'analysis',name:a.name||(a.items[0]?a.items[0].name+' 외 '+(a.items.length-1)+'개':'분석'),raw:a.raw,n:a.items.length,at:Date.now()}); persistSaved(); s=state.saved[0]; } return s.at; }
+
+// ===== 배합 비교 (A/B) =====
+function compareSide(s){
+  if (!s) return null;
+  if (s.k==='recipe'){ const R=evaluate(s); return {kind:'recipe',name:s.name,type:TYPES[s.typeId]?TYPES[s.typeId].name:'',items:R.items.map(i=>({id:i.id,pct:i.pct})),R,A:assess(s),grade:R.grade,pack:s.pack,at:s.at}; }
+  const items=parseList(s.raw).map((n,i)=>({name:n,id:findIng(n),pos:i})); const S=analysisSummary(items);
+  return {kind:'analysis',name:s.name,type:S.character,items:items.filter(i=>i.id).map(i=>({id:i.id,pos:i.pos})),S,grade:S.grade,at:s.at};
+}
+function radarSVG(A,B){
+  const keys=Object.keys(AX_N); const cx=110,cy=100,r=64; const pt=(i,v)=>{ const a=-Math.PI/2+i*Math.PI*2/keys.length; const rr=r*(v/5); return [cx+Math.cos(a)*rr, cy+Math.sin(a)*rr]; };
+  const poly=ax=>keys.map((k,i)=>pt(i,ax[k]).map(n=>n.toFixed(1)).join(',')).join(' ');
+  const rings=[1,2,3,4,5].map(v=>`<polygon points="${keys.map((k,i)=>pt(i,v).map(n=>n.toFixed(1)).join(',')).join(' ')}" fill="none" stroke="var(--line)" stroke-width="${v===5?1.2:0.6}"/>`).join('');
+  const spokes=keys.map((k,i)=>{ const [x,y]=pt(i,5); return `<line x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="var(--line)" stroke-width="0.6"/>`; }).join('');
+  const labels=keys.map((k,i)=>{ const [x,y]=pt(i,6.15); return `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="middle" dominant-baseline="middle" font-size="10.5" fill="var(--muted)">${AX_N[k]}</text>`; }).join('');
+  return `<svg viewBox="0 0 220 200" class="radar" role="img" aria-label="6개 항목 비교"><g>${rings}${spokes}</g><polygon points="${poly(A.ax)}" fill="var(--primary)" fill-opacity=".22" stroke="var(--primary)" stroke-width="2"/><polygon points="${poly(B.ax)}" fill="var(--secondary)" fill-opacity=".18" stroke="var(--secondary)" stroke-width="2" stroke-dasharray="4 3"/>${labels}</svg>`;
+}
+function viewCompare(){
+  const [sa,sb]=state.compare.sel.map(at=>state.saved.find(s=>s.at===at)); const A=compareSide(sa), B=compareSide(sb);
+  if (!A||!B) return topbar('비교','saved') + `<div class="stack"><div class="empty">보관함에서 두 개를 골라 주세요.</div><button class="btn tonal" data-act="nav" data-to="saved" data-dir="back">보관함으로</button></div>`;
+  const ids=(s)=>new Set(s.items.map(i=>i.id)); const ia=ids(A), ib=ids(B);
+  const common=[...ia].filter(id=>ib.has(id)), onlyA=[...ia].filter(id=>!ib.has(id)), onlyB=[...ib].filter(id=>!ia.has(id));
+  const pctOf=(s,id)=>{ const it=s.items.find(i=>i.id===id); return it&&it.pct!=null?fmt(it.pct)+'%':null; };
+  const both=A.kind==='recipe'&&B.kind==='recipe';
+  const head=(s,cls)=>`<div class="cmp-head ${cls}"><div class="tag">${cls==='a'?'A':'B'}</div><b>${esc(s.name)}</b><small>${esc(s.type)}${s.kind==='recipe'?` · 성분 ${s.items.length}개`:` · 성분 ${s.items.length}개 매칭`}</small><div class="wrap" style="gap:4px;justify-content:center">${s.A?`<span class="badge ${s.A.letter[0]==='A'?'g0':s.A.letter==='B'?'g1':'g2'}">평가 ${s.A.letter} · ${s.A.pts}점</span>`:''}${gradeBadges(s.grade)}</div></div>`;
+  const dots = n => `<span class="dots">${[1,2,3,4,5].map(i=>`<i class="${i<=n?'on':''}"></i>`).join('')}</span>`;
+  const cmpChip=(id)=>{ const pa=pctOf(A,id), pb=pctOf(B,id); return `<span class="row" style="gap:4px">${ingChip(id)}${pa||pb?`<span class="badge num">${pa||'–'} / ${pb||'–'}</span>`:''}</span>`; };
+  return topbar('배합 비교','saved') + `<div class="stack">
+    <div class="cmp-grid">${head(A,'a')}${head(B,'b')}</div>
+    ${both ? `<div class="card stack" style="gap:10px"><div class="between"><h3 class="h3">평가 6개 항목</h3><span class="xs"><span class="lg-a">━ A</span> <span class="lg-b">╌ B</span></span></div>
+      <div class="cmp-radar">${radarSVG(A.A,B.A)}<div class="stack" style="gap:8px;flex:1;min-width:0">${Object.keys(AX_N).map(k=>`<div class="cmp-ax"><span class="n">${AX_N[k]}</span><span class="row" style="gap:6px"><span class="lg-a">A</span>${dots(A.A.ax[k])}</span><span class="row" style="gap:6px"><span class="lg-b">B</span>${dots(B.A.ax[k])}</span>${A.A.ax[k]!==B.A.ax[k]?`<span class="xs ${A.A.ax[k]>B.A.ax[k]?'lg-a':'lg-b'}">${A.A.ax[k]>B.A.ax[k]?'A':'B'} +${Math.abs(A.A.ax[k]-B.A.ax[k])}</span>`:`<span class="xs muted">같음</span>`}</div>`).join('')}</div></div>
+      <div class="cmp-grid"><div class="tip" style="margin:0"><div><b>A</b> — ${esc(A.A.verdict)}<br><span class="muted">${esc(A.A.texture)}</span></div></div><div class="tip" style="margin:0"><div><b>B</b> — ${esc(B.A.verdict)}<br><span class="muted">${esc(B.A.texture)}</span></div></div></div></div>
+    <div class="card stack" style="gap:8px"><h3 class="h3">구성 비율</h3><div class="cmp-grid"><div class="stack" style="gap:4px"><span class="xs lg-a">A</span>${compositionBar(A.R.groups)}</div><div class="stack" style="gap:4px"><span class="xs lg-b">B</span>${compositionBar(B.R.groups)}</div></div></div>` : `
+    <div class="card stack" style="gap:8px"><h3 class="h3">역할 구성</h3><div class="cmp-grid"><div class="stack" style="gap:4px"><span class="xs lg-a">A</span>${A.kind==='recipe'?compositionBar(A.R.groups):compositionHTML(A.S.matched)}</div><div class="stack" style="gap:4px"><span class="xs lg-b">B</span>${B.kind==='recipe'?compositionBar(B.R.groups):compositionHTML(B.S.matched)}</div></div></div>`}
+    <div class="card stack" style="gap:10px"><h3 class="h3">성분 차이 <span class="muted" style="font-weight:500">공통 ${common.length} · A만 ${onlyA.length} · B만 ${onlyB.length}</span></h3>
+      <div class="stack" style="gap:6px"><b class="small">공통 ${both?'<span class="muted" style="font-weight:400">(A / B 비율)</span>':''}</b>${common.length?`<div class="wrap">${common.map(cmpChip).join('')}</div>`:'<p class="small muted">공통 성분이 없어요.</p>'}</div>
+      <div class="cmp-grid"><div class="stack" style="gap:6px"><b class="small lg-a">A에만</b>${onlyA.length?`<div class="wrap">${onlyA.map(id=>{ const p=pctOf(A,id); return `<span class="row" style="gap:4px">${ingChip(id)}${p?`<span class="badge num">${p}</span>`:''}</span>`; }).join('')}</div>`:'<p class="small muted">없음</p>'}</div>
+      <div class="stack" style="gap:6px"><b class="small lg-b">B에만</b>${onlyB.length?`<div class="wrap">${onlyB.map(id=>{ const p=pctOf(B,id); return `<span class="row" style="gap:4px">${ingChip(id)}${p?`<span class="badge num">${p}</span>`:''}</span>`; }).join('')}</div>`:'<p class="small muted">없음</p>'}</div></div></div>
+    <div class="grid2"><button class="btn outl" data-act="load-at" data-at="${A.at}">A 열기</button><button class="btn outl" data-act="load-at" data-at="${B.at}">B 열기</button></div>
+    <button class="btn text" data-act="compare-reset">다른 조합 고르기</button>
+  </div>`;
+}
+
+// ===== 안내 투어 (배합 화면) =====
+const TOUR_STEPS = [
+  {sel:'.palette-host .palette, [data-act="open-palette"]', t:'1 · 성분 넣기', x:'여기서 성분을 검색해 비커에 넣어요. 성분 이름을 누르면 카드에서 설명을 읽고 「비커에 넣기」를 고를 수 있어요.'},
+  {sel:'#rows', t:'2 · 비율 맞추기', x:'슬라이더를 끌거나 숫자를 눌러 직접 입력해요. 「정제수로 100% 맞추기」를 켜 두면 나머지를 정제수가 채워요.'},
+  {sel:'#totalPill', t:'3 · 합계', x:'헤더의 합계가 100%가 되면 초록으로 바뀌어요. 손을 뗄 때 확인 사항이 이 아래에 알림으로 떠요.'},
+  {sel:'[data-act="recommend"]', t:'4 · 추천 비율', x:'막막하면 이 버튼으로 넣은 성분을 권장 범위에 맞춰 자동으로 배분해요. 「권장 범위」에서 기준도 볼 수 있어요.'},
+  {sel:'[data-act="to-report"]', t:'5 · 리포트 보기', x:'다 됐으면 효능·부작용 리포트 → 용기 고르기 → 완성 카드와 평가로 이어져요.'},
+];
+const TOUR = {i:-1};
+function tourTarget(step){ return [...document.querySelectorAll(step.sel)].find(el=>el.offsetParent!==null && el.getBoundingClientRect().width>0); }
+function startTour(){ TOUR.i=0; showTourStep(); }
+function endTour(){ TOUR.i=-1; const o=$('#tour'); if(o) o.hidden=true; store.set('lab.tour', 1); }
+function showTourStep(){
+  const o=$('#tour'); if(!o) return; const step=TOUR_STEPS[TOUR.i]; if(!step){ endTour(); return; }
+  const el=tourTarget(step); if(!el){ TOUR.i++; showTourStep(); return; }
+  el.scrollIntoView({block:'center', behavior:'instant'});
+  const r=el.getBoundingClientRect(); const pad=8; const vw=innerWidth, vh=innerHeight;
+  const last=TOUR.i===TOUR_STEPS.length-1;
+  o.hidden=false;
+  o.innerHTML=`<div class="tour-hole" style="left:${Math.max(4,r.left-pad)}px;top:${Math.max(4,r.top-pad)}px;width:${Math.min(vw-8,r.width+pad*2)}px;height:${Math.min(vh-8,r.height+pad*2)}px"></div>
+  <div class="tour-card" id="tourCard"><div class="between"><b>${esc(step.t)}</b><span class="xs muted">${TOUR.i+1} / ${TOUR_STEPS.length}</span></div><p class="small">${esc(step.x)}</p><div class="row" style="justify-content:flex-end;gap:6px"><button class="btn text" data-act="tour-skip">건너뛰기</button><button class="btn" style="min-height:40px;padding:0 16px" data-act="tour-next">${last?'시작하기':'다음'}</button></div></div>`;
+  const card=$('#tourCard'); const ch=card.offsetHeight, cw=Math.min(340, vw-32);
+  let top = r.bottom+pad+12; if (top+ch>vh-16) top = r.top-pad-12-ch; if (top<16) top = Math.min(vh-ch-16, Math.max(16, r.bottom+pad+12));
+  let left = Math.min(vw-cw-16, Math.max(16, r.left+r.width/2-cw/2));
+  card.style.top=top+'px'; card.style.left=left+'px'; card.style.width=cw+'px';
+}
+function maybeStartTour(){ if (state.screen!=='mix' || !state.recipe) return; if (store.get('lab.tour',0) && !state._tourAsk) return; state._tourAsk=false; setTimeout(startTour, 450); }
+
 // ===== 화면: 용기·포장 =====
 function viewPack(){
   const r=state.recipe; const t=TYPES[r.typeId]; const p=r.pack; const R=evaluate(r);
@@ -1140,6 +1278,7 @@ function viewAnalyze(){
     <div class="stack" style="gap:10px"><div class="between"><h2 class="h3">성분 ${a.items.length}개 <span class="muted" style="font-weight:400">· 표기 순</span></h2><span class="xs muted">칩을 누르면 성분 카드</span></div>
       <div class="wrap">${a.items.map(i=> i.id ? ingChip(i.id,{pos:i.pos<5}) : unknownChip(i.name)).join('')}</div>
       ${S.unknown.length ? `<div class="row" style="flex-wrap:wrap">${alertHTML('info','',`${S.unknown.length}개 성분은 DB에 없어요.`)}${aiOn()?(state.aiBusy.unk?`<span class="thinking"><i></i>AI가 찾는 중…</span>`:(S.unknown.every(u=>a.aiInfo[u.name])?'':`<button class="btn tonal" data-act="ai-unknown" ${aiLeft()?'':'disabled'}>${ic('spark','s')} AI에게 물어보기</button>`)):''}</div>`:''}</div>
+    <div class="card stack" style="gap:8px"><div class="between" style="gap:8px"><div><h3 class="h3">내 화장대에 담기</h3><p class="xs muted">아침·저녁에 같이 쓰는 제품끼리 궁합을 확인해요.</p></div><button class="btn tonal" style="min-height:40px;padding:0 14px;white-space:nowrap" data-act="routine-add-current">${ic('face','s')} 담기</button></div></div>
     <div class="card stack" style="gap:10px"><div class="between"><h3 class="h3">이 조합으로 만들기</h3>${a.makeType?'':`<button class="btn tonal" data-act="a-make">${ic('flask','s')} 비커에 담기</button>`}</div>
       ${a.makeType?`<p class="small">어떤 종류로 만들까요? <span class="muted">(추천: ${TYPES[S.guess].name})</span></p><div class="row"><select id="makeSel" style="flex:1;min-height:44px;border-radius:12px;border:1px solid var(--line2);background:var(--surface);padding:0 12px">${Object.values(TYPES).map(t=>`<option value="${t.id}" ${t.id===a.makeType?'selected':''}>${t.name}</option>`).join('')}</select><button class="btn" data-act="a-make-go">담기</button></div>`:`<p class="small muted">읽은 성분을 종류에 맞는 비율로 비커에 담아요. 비율은 표기 순서를 바탕으로 한 추정값이라 슬라이더로 조정하세요.</p>`}</div>`
     : `<div class="card tint stack" style="gap:6px"><b class="small">이렇게 써요</b><p class="small muted">1. 제품 뒷면의 「전성분」을 사진으로 찍거나 텍스트로 붙여넣어요.<br>2. 성분마다 역할 색과 안심·주의·경고 등급을 달아 줘요.<br>3. 마음에 들면 「이 조합으로 만들기」로 배합 화면에 옮겨요.</p></div>`}
@@ -1218,11 +1357,13 @@ function viewSaved(){
   const top=Object.entries(cnt).sort((a,b)=>b[1]-a[1]).slice(0,5);
   const syncBadge = c.ref ? `<span class="badge g0">${ic('cloud','xs')} 클라우드 동기화</span>` : (c.ready ? `<span class="badge">이 기기에만 저장</span>` : '');
   return topbar('보관함', 'home', syncBadge) + `<div class="stack">
-    <div class="seg two"><button class="${tab==='mine'?'sel':''}" data-act="saved-tab" data-v="mine">${ic('archive','xs')} 내 보관함</button><button class="${tab==='gallery'?'sel':''}" data-act="saved-tab" data-v="gallery">${ic('globe','xs')} 갤러리</button></div>
-    ${tab==='mine' ? `
+    <div class="seg"><button class="${tab==='mine'?'sel':''}" data-act="saved-tab" data-v="mine">${ic('archive','xs')} 보관함</button><button class="${tab==='routine'?'sel':''}" data-act="saved-tab" data-v="routine">${ic('face','xs')} 내 화장대</button><button class="${tab==='gallery'?'sel':''}" data-act="saved-tab" data-v="gallery">${ic('globe','xs')} 갤러리</button></div>
+    ${tab==='routine' ? routineHTML() : tab==='mine' ? `
+    ${state.saved.length>=2?`<div class="between"><span class="small muted">${state.compare.on?`비교할 항목을 두 개 고르세요 (${state.compare.sel.length}/2)`:'두 배합이나 두 제품을 나란히 비교할 수 있어요'}</span><button class="btn ${state.compare.on?'tonal':'text'}" style="min-height:36px;padding:0 12px" data-act="compare-toggle">${ic('swap','xs')} ${state.compare.on?'비교 취소':'비교'}</button></div>`:''}
+    ${state.compare.on&&state.compare.sel.length===2?`<button class="btn wide" data-act="compare-go">${ic('swap','s')} 두 개 비교하기</button>`:''}
     <div class="stat3"><div><b class="num">${recipes.length}</b><span>배합</span></div><div><b class="num">${analyses.length}</b><span>분석</span></div><div><b class="num">${top.length?top[0][1]:0}</b><span>${top.length?esc(top[0][0]):'자주 쓴 성분'}</span></div></div>
     ${top.length?`<div class="wrap" style="align-items:center"><span class="xs muted">자주 쓴 성분</span>${top.map(([id,n])=>ingChip(id,{pct:null})).join('')}</div>`:''}
-    ${state.saved.length ? state.saved.map((s,i)=>`<div class="row" style="gap:6px">${savedItem(s,i)}<button class="iconbtn sm" data-act="del-saved" data-i="${i}" aria-label="삭제">${ic('trash','s')}</button></div>`).join('') : `<div class="empty">저장한 배합과 분석이 여기에 쌓여요.</div>`}
+    ${state.saved.length ? state.saved.map((s,i)=>`<div class="row" style="gap:6px">${savedItem(s,i)}${state.compare.on?'':`<button class="iconbtn sm" data-act="del-saved" data-i="${i}" aria-label="삭제">${ic('trash','s')}</button>`}</div>`).join('') : `<div class="empty">저장한 배합과 분석이 여기에 쌓여요.</div>`}
     <p class="footnote">${c.ref?'Claude 계정으로 클라우드에 저장돼 다른 기기에서도 같은 보관함을 봐요. 보관함은 나만 볼 수 있어요.':'이 기기의 브라우저에 저장돼요. Claude 안에서 열면 계정으로 동기화돼요.'}</p>`
     : `
     <div class="between"><p class="small muted">연구원들이 공개한 배합이에요. 마음에 들면 ♥, 비커에 담아 고쳐 볼 수 있어요.</p><button class="iconbtn sm" data-act="gallery-refresh" aria-label="새로 고침">${ic('refresh','s')}</button></div>
@@ -1235,12 +1376,14 @@ function viewDict(){
   const q=norm(state.dictQ);
   const list=DB.filter(g=>{ if(state.dictRole!=='all'){ const r=state.dictRole; if(r==='nat'){ if(!isNatural(g)) return false; } else if(r==='a25'){ if(!g.a25) return false; } else if(r==='pres'){ if(!['pres','antiox','chel','ph','thick'].includes(g.r)) return false; } else if(r==='frag'){ if(!['frag','col'].includes(g.r)) return false; } else if(groupOf(g.r)!==r||['pres','antiox','chel','ph','thick'].includes(g.r)) return false; }
     if(state.dictGrade!=='all' && g.g!==+state.dictGrade) return false;
+    if(state.dictFn!=='all' && !g.b.includes(state.dictFn)) return false;
+    if(state.dictOrigin!=='all' && originOf(g)!==state.dictOrigin) return false;
     if(q && ![g.ko,g.inci,...g.al].some(n=>norm(n).includes(q))) return false; return true; });
   return topbar('성분 사전','home') + `<div class="stack">
     <div class="sticky-filters">
     <label class="field">${ic('search','s')}<span class="sr">성분 검색</span><input type="search" id="dictQ" placeholder="한글명·INCI·옛 이름으로 검색" value="${esc(state.dictQ)}" autocomplete="off"></label>
     <div class="chiprow">${[...PAL_ROLES,['a25','알레르기 25종']].map(([k,n])=>`<button class="chip sm ${state.dictRole===k?'sel':''}" data-act="dict-role" data-v="${k}">${n}</button>`).join('')}</div>
-    <div class="row" style="flex-wrap:wrap"><span class="xs muted">등급</span>${[['all','전체'],['0','안심'],['1','주의'],['2','경고']].map(([k,n])=>`<button class="chip sm ${state.dictGrade===k?'sel':''}" data-act="dict-grade" data-v="${k}">${n}</button>`).join('')}<span class="xs muted" style="margin-left:auto">${list.length}개 / 전체 ${DB.length}개</span></div>
+    <div class="row" style="flex-wrap:wrap"><span class="xs muted">등급</span>${[['all','전체'],['0','안심'],['1','주의'],['2','경고']].map(([k,n])=>`<button class="chip sm ${state.dictGrade===k?'sel':''}" data-act="dict-grade" data-v="${k}">${n}</button>`).join('')}<select class="msel sm" id="dictFn" aria-label="기능"><option value="all">기능 전체</option>${Object.keys(BENEFIT_TXT).map(k=>`<option value="${k}" ${state.dictFn===k?'selected':''}>${k}</option>`).join('')}</select><select class="msel sm" id="dictOrigin" aria-label="유래"><option value="all">유래 전체</option>${Object.entries(ORIGIN_N).filter(([k])=>k!=='water').map(([k,n])=>`<option value="${k}" ${state.dictOrigin===k?'selected':''}>${n}</option>`).join('')}</select><span class="xs muted" style="margin-left:auto">${list.length}개 / 전체 ${DB.length}개</span></div>
     </div>
     <div class="dict-grid" id="dictList">${list.length?list.map(g=>`<button class="dcard" data-act="open-ing" data-id="${esc(g.ko)}">${ingArt(g,'art sm')}<span class="t"><b>${esc(g.ko)}</b><small>${esc(g.inci)}</small><span class="row" style="gap:4px"><span class="badge g${g.g}">${GRADE[g.g]}</span><small>${ROLE[g.r].n}</small></span></span></button>`).join(''):`<div class="empty" style="grid-column:1/-1">맞는 성분이 없어요.</div>`}</div>
     <p class="footnote">명칭은 대한화장품협회 성분사전 표준명, 그림은 역할의 원리를 나타낸 도식이에요. 등급과 설명은 이 데모가 정한 요약이라 정식 버전 전에 검수가 필요해요.</p>
@@ -1285,6 +1428,7 @@ function openIng(id, name, ctx){
     <dl class="kv" style="margin:0">${g.mx!=null&&g.mx>=0.01?`<div><dt>권장 상한(앱 기준)</dt><dd>${g.mx}%</dd></div>`:''}${g.a25?`<div><dt>표시 의무</dt><dd>씻어내지 않는 제품 0.001%, 씻어내는 제품 0.01% 초과 시</dd></div>`:''}${g.b.length?`<div><dt>기대 역할</dt><dd>${g.b.map(b=>BENEFIT_TXT[b]||b).join(', ')}</dd></div>`:''}<div><dt>DIY 레시피</dt><dd>${g.diy===1?'초보 목록에 있음':g.diy===2?'고급 원료':'초보 목록에 없음'}</dd></div></dl>
     ${g.al.length?`<p class="xs muted">다른 표기: ${esc(g.al.slice(0,5).join(', '))}</p>`:''}
     <div class="between" style="gap:8px;flex-wrap:wrap"><span class="small ${isAvoided(g)?'':'muted'}">${isAvoided(g)?`${ic('shield','xs')} 내 프로필에서 피하는 성분이에요 (${esc(avoidReasons(g).join(', '))})`:'내 피부에 안 맞았던 성분이라면'}</span><button class="btn text" style="min-height:34px;padding:0 10px" data-act="avoid-id" data-id="${esc(g.ko)}" data-card="1">${state.avoid.ids.includes(g.ko)?'피하기 해제':'피하기에 추가'}</button></div>
+    <a class="link-out" href="https://www.google.com/search?q=${encodeURIComponent(g.ko+' 화장품')}" target="_blank" rel="noopener">${ic('search','xs')} 이 성분이 든 시중 제품 검색 ↗</a>
     <p class="footnote">명칭: 대한화장품협회 성분사전 표준명 기준 · 설명과 등급은 이 데모가 정한 요약이에요.</p>
     ${aiOn()?`<div class="between"><span class="small muted">더 알고 싶다면</span>${state.aiBusy.ing?`<span class="thinking"><i></i>답변 중…</span>`:`<button class="btn text" data-act="ai-ing" data-id="${esc(g.ko)}" ${aiLeft()?'':'disabled'}>${ic('spark','s')} AI에게 물어보기</button>`}</div><div class="ai-box small" id="aiIng"></div>`:''}
     ${actions}`;
@@ -1322,7 +1466,7 @@ function saveAnalysis(){
 
 // ===== 클라우드 보관함 · 갤러리 (Claude 안에서 열었을 때) =====
 function persistSaved(){ state.saved=state.saved.slice(0,50); store.set('lab.saved',state.saved); persistCloud(); }
-async function persistCloud(){ const c=state.cloud; if(!c.ref) return; try{ await c.ref.set({saved:state.saved, skin:state.skin, avoid:state.avoid, at:Date.now()}); c.synced=true; }catch(e){ c.synced=false; if(e&&e.code==='quota_exceeded') toast('클라우드 저장 공간이 가득 찼어요.'); } }
+async function persistCloud(){ const c=state.cloud; if(!c.ref) return; try{ await c.ref.set({saved:state.saved, skin:state.skin, avoid:state.avoid, routine:state.routine, at:Date.now()}); c.synced=true; }catch(e){ c.synced=false; if(e&&e.code==='quota_exceeded') toast('클라우드 저장 공간이 가득 찼어요.'); } }
 function mergeSaved(remote){ const map=new Map(); [...state.saved, ...(remote||[])].forEach(s=>{ if(!s||!s.at) return; const k=s.at+'|'+s.k; if(!map.has(k)) map.set(k,s); }); state.saved=[...map.values()].sort((a,b)=>b.at-a.at).slice(0,50); }
 async function initCloud(){
   try{
@@ -1334,7 +1478,7 @@ async function initCloud(){
     if (uid){
       const ref = db.doc('data/users/'+uid+'/lab'); state.cloud.ref=ref;
       const snap = await ref.get();
-      if (snap.exists){ const d=snap.data()||{}; mergeSaved(d.saved); if(d.skin && !state.skin) state.skin=d.skin; if(d.avoid && !avoidCount() && (d.avoid.groups||d.avoid.ids)) { state.avoid={groups:d.avoid.groups||[], ids:d.avoid.ids||[]}; store.set('lab.avoid',state.avoid); } store.set('lab.saved',state.saved); }
+      if (snap.exists){ const d=snap.data()||{}; mergeSaved(d.saved); if(d.skin && !state.skin) state.skin=d.skin; if(d.avoid && !avoidCount() && (d.avoid.groups||d.avoid.ids)) { state.avoid={groups:d.avoid.groups||[], ids:d.avoid.ids||[]}; store.set('lab.avoid',state.avoid); } if(d.routine && !(state.routine.am||[]).length && !(state.routine.pm||[]).length){ state.routine={am:d.routine.am||[], pm:d.routine.pm||[]}; store.set('lab.routine',state.routine); } store.set('lab.saved',state.saved); }
       await persistCloud();
       ref.onSnapshot(s=>{ if(!s.exists||s.metadata.hasPendingWrites) return; const d=s.data()||{}; const remote=(d.saved||[]).slice(0,50); if(JSON.stringify(remote)!==JSON.stringify(state.saved)){ state.saved=remote; store.set('lab.saved',state.saved); if(['home','saved'].includes(state.screen)) render(); } }, ()=>{});
     }
@@ -1377,13 +1521,15 @@ function galleryItem(g){
 }
 
 // ===== 렌더 =====
-const VIEWS={home:viewHome,type:viewType,mix:viewMix,report:viewReport,pack:viewPack,done:viewDone,analyze:viewAnalyze,saved:viewSaved,dict:viewDict};
+const VIEWS={home:viewHome,type:viewType,mix:viewMix,report:viewReport,pack:viewPack,done:viewDone,analyze:viewAnalyze,saved:viewSaved,dict:viewDict,compare:viewCompare};
 function render(){
   if (['mix','report','pack','done'].includes(state.screen) && !state.recipe) state.screen='type';
+  if (state.screen!=='saved' && state.compare.on){ state.compare.on=false; }
   const anim = state._anim || 'none'; state._anim='';
   $('#main').innerHTML = `<div class="screen ${anim}">${VIEWS[state.screen]()}</div>`;
   if (state.screen==='mix' && state.recipe){ const R=evaluate(state.recipe); if (anim!=='none'){ MIX_AL.shown.clear(); MIX_AL.flashes=[]; MIX_AL.visible=false; MIX_AL.userDismissed=false; syncMixAlerts(R,{force:true}); } else { const wasVisible=MIX_AL.visible; syncMixAlerts(R,{silent:true}); if (wasVisible) renderBanners(true); } } else { clearTimeout(MIX_AL.timer); MIX_AL.visible=false; }
-  const navKey = {home:'home',type:'make',mix:'make',report:'make',pack:'make',done:'make',analyze:'analyze',saved:'saved',dict:'dict'}[state.screen];
+  const navKey = {home:'home',type:'make',mix:'make',report:'make',pack:'make',done:'make',analyze:'analyze',saved:'saved',compare:'saved',dict:'dict'}[state.screen];
+  if (state.screen==='mix' && anim!=='none') maybeStartTour();
   document.querySelectorAll('.navitem').forEach(b=>b.classList.toggle('on', b.dataset.to===navKey));
   document.title = '내 화장품 연구소';
 }
@@ -1432,6 +1578,23 @@ document.addEventListener('click', e=>{
     case 'ai-enable': enableAI(); break;
     case 'settings': openSettings(); break;
     case 'consent-ok': acceptConsent(); break;
+    case 'routine-slot': state.routineSlot=d.v; render(); break;
+    case 'routine-pick': $('#sheetIngBody').innerHTML=routinePickHTML(d.slot); openSheet('sheetIng'); break;
+    case 'routine-toggle': { const l=state.routine[d.slot]=state.routine[d.slot]||[]; const at=+d.at; const i=l.indexOf(at); if(i>=0) l.splice(i,1); else l.push(at); saveRoutine(); $('#sheetIngBody').innerHTML=routinePickHTML(d.slot); if(state.screen==='saved') render(); break; }
+    case 'routine-remove': { const l=state.routine[d.slot]||[]; const i=l.indexOf(+d.at); if(i>=0) l.splice(i,1); saveRoutine(); render(); break; }
+    case 'routine-open': { const s=state.saved.find(x=>x.at===+d.at); if(!s) break; state.analysis.raw=s.raw; state.analysis.name=s.name; state.analysis.tab='text'; analyzeRaw(); go('analyze'); break; }
+    case 'routine-add-current': { const at=ensureAnalysisSaved(); if(at==null){ toast('먼저 전성분을 분석해 주세요.'); break; } $('#sheetIngBody').innerHTML=slotPickHTML(at); openSheet('sheetIng'); break; }
+    case 'routine-put': { const at=+d.at; const slots=d.slot==='both'?['am','pm']:[d.slot]; slots.forEach(sl=>{ const l=state.routine[sl]=state.routine[sl]||[]; if(!l.includes(at)) l.push(at); }); saveRoutine(); closeSheets(); toast(`내 화장대(${slots.map(x=>x==='am'?'아침':'저녁').join('·')})에 담았어요.`); state.savedTab='routine'; state.routineSlot=slots[0]; go('saved'); break; }
+    case 'compare-toggle': state.compare.on=!state.compare.on; state.compare.sel=[]; render(); break;
+    case 'cmp-pick': { const at=+d.at; const sel=state.compare.sel; const i=sel.indexOf(at); if(i>=0) sel.splice(i,1); else { if(sel.length>=2) sel.shift(); sel.push(at); } render(); break; }
+    case 'compare-go': if(state.compare.sel.length===2) go('compare'); break;
+    case 'compare-reset': state.compare.on=true; state.compare.sel=[]; state.savedTab='mine'; go('saved','back'); break;
+    case 'load-at': { const i=state.saved.findIndex(x=>x.at===+d.at); if(i<0) break; const s=state.saved[i]; if(s.k==='recipe'){ state.recipe={name:s.name,typeId:s.typeId,items:s.items.map(x=>({...x})),pack:{...s.pack},auto:s.auto!==false}; state.pickType=s.typeId; state.cat=TYPES[s.typeId].cat; go('mix'); } else { state.analysis.raw=s.raw; state.analysis.name=s.name; state.analysis.tab='text'; analyzeRaw(); go('analyze'); } break; }
+    case 'set-font': state.cfg.fontScale=d.v; saveCfg(); applyScale(); refreshSettings(); break;
+    case 'set-theme': state.cfg.theme=d.v; saveCfg(); applyTheme(); refreshSettings(); break;
+    case 'tour-start': closeSheets(); if(state.screen==='mix'&&state.recipe){ startTour(); } else { state._tourAsk=true; toast('배합 화면에 들어가면 안내가 시작돼요.'); if(!state.recipe) go('type'); else go('mix'); } break;
+    case 'tour-next': TOUR.i++; showTourStep(); break;
+    case 'tour-skip': endTour(); break;
     case 'avoid-open': openAvoidSheet(); break;
     case 'avoid-group': { const g=state.avoid.groups; const i=g.indexOf(d.v); if(i>=0) g.splice(i,1); else g.push(d.v); saveAvoid(); refreshAvoidSheet(); if(state.screen==='home') render(); break; }
     case 'avoid-id': { const ids=state.avoid.ids; const i=ids.indexOf(d.id); if(i>=0) ids.splice(i,1); else ids.push(d.id); saveAvoid(); toast(i>=0?`${d.id}을(를) 피하기에서 뺐어요.`:`${d.id}을(를) 피하는 성분에 넣었어요.`); if (d.card){ openIng(d.id, null, state._ingCtx); } else { refreshAvoidSheet(); const q=$('#avoidQ'); if(q){ q.focus(); } } if(state.screen==='home') render(); break; }
@@ -1483,13 +1646,16 @@ document.addEventListener('change', e=>{
   if (t.id==='autoBal' && state.recipe){ state.recipe.auto=t.checked; balance(state.recipe); patchMix(); }
   else if (t.id==='photoIn' || t.classList.contains('photo-in')){ const f=t.files&&t.files[0]; if(f) runPhoto(f); }
   else if (t.id==='modelSel'){ const p=state.cfg.provider; if (t.value==='__custom'){ state.cfg.model[p]='__custom'; saveCfg(); refreshSettings(); const i=$('#modelIn'); if(i) i.focus(); } else { state.cfg.model[p]=t.value; saveCfg(); state.aiTest=null; if(state.screen==='home') render(); } }
+  else if (t.id==='dictFn'){ state.dictFn=t.value; render(); }
+  else if (t.id==='dictOrigin'){ state.dictOrigin=t.value; render(); }
   else if (t.id==='remKey'){ state.cfg.remember=t.checked; saveCfg(); saveKeys(); toast(t.checked?'키를 이 브라우저에 저장해요.':'키를 저장하지 않고 이 탭에서만 써요.'); }
 });
-document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeSheets(); if(e.key==='Enter' && e.target && e.target.matches('[data-pctin]')) e.target.blur(); });
+document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ closeSheets(); if (TOUR.i>=0) endTour(); } if(e.key==='Enter' && e.target && e.target.matches('[data-pctin]')) e.target.blur(); });
 document.addEventListener('toggle', e=>{ if(e.target && e.target.id==='diyDetails') state.diyOpen=e.target.open; }, true);
-let rzT; window.addEventListener('resize', ()=>{ clearTimeout(rzT); rzT=setTimeout(()=>{ if(state.screen==='mix') render(); }, 200); });
+let rzT; window.addEventListener('resize', ()=>{ applyScale(); if (TOUR.i>=0) showTourStep(); clearTimeout(rzT); rzT=setTimeout(()=>{ if(state.screen==='mix') render(); }, 200); });
 
 // ===== 시작 =====
+applyScale(); applyTheme();
 render();
 if (!(store.get('lab.consent',null)||{}).v) showConsent();
 (async()=>{

@@ -434,18 +434,16 @@ details .exp,details .tbl{animation:fadeUp .3s both}
 .eval-cols{display:grid;grid-template-columns:1fr;gap:12px;border-top:1px solid var(--line);padding-top:10px}
 @media (min-width:600px){.eval-cols{grid-template-columns:1fr 1fr}.eval-axes{grid-template-columns:1fr 1fr;column-gap:20px}}
 @media (max-width:420px){.eval-ax{grid-template-columns:70px auto;grid-template-rows:auto auto}.eval-ax .w{grid-column:1/-1;margin-top:-2px}}
-/* PC: 화면이 넓어지는 만큼 글자·그림·여백을 함께 키움 (--z 배율, vh 기준 높이는 배율로 나눠 보정) */
-:root{--z:1}
+/* 화면 배율: PC 폭(1.12/1.22/1.32) × 글자 크기 설정(작게 .9 / 보통 1 / 크게 1.12) — JS가 --zoom을 계산. vh·% 높이는 배율로 나눠 보정 */
+:root{--zoom:1}
 @supports (zoom:1.1){
-  @media (min-width:900px){ :root{--z:1.12} }
-  @media (min-width:1280px){ :root{--z:1.22} }
-  @media (min-width:1600px){ :root{--z:1.32} }
+  main,.sheet,.consent .box,.toast{zoom:var(--zoom)}
+  .sheet{max-height:calc(88% / var(--zoom))}
+  .sheet .palette{max-height:calc(70vh / var(--zoom))}
+  .palette-host .palette{max-height:calc((100vh - 100px) / var(--zoom))}
+  .avoid-list{max-height:calc(40vh / var(--zoom))}
   @media (min-width:900px){
-    main,.sheet,.consent .box,.toast{zoom:var(--z)}
-    .sheet{max-height:calc(80vh / var(--z))}
-    .sheet .palette{max-height:calc(70vh / var(--z))}
-    .palette-host .palette{max-height:calc((100vh - 100px) / var(--z))}
-    .avoid-list{max-height:calc(40vh / var(--z))}
+    .sheet{max-height:calc(80vh / var(--zoom))}
     .rail .navitem{font-size:13px;width:80px}
     .rail .navitem .pill{width:60px;height:36px;border-radius:18px}
     .rail .icon{width:26px;height:26px}
@@ -490,6 +488,36 @@ details .exp,details .tbl{animation:fadeUp .3s both}
 .badge.tot.warn{background:var(--warn-bg);color:var(--warn-fg)}
 .badge.tot.bad{background:var(--bad-bg);color:var(--bad-fg)}
 @media (max-width:460px){.badge.tot .lbl{display:none}.badge.tot{min-width:0;padding:4px 9px}.badge.tot b{margin-left:0}}
+/* 내 화장대 · 비교 · 투어 · 사전 필터 */
+.routine-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.routine-list li{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:14px;background:var(--surface2)}
+.routine-list .no{width:24px;height:24px;border-radius:12px;background:var(--primary);color:var(--on-primary);display:inline-flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:700;flex-shrink:0}
+.routine-list .info{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;background:none;border:0;text-align:left;color:var(--text);padding:0;cursor:pointer}
+.routine-list li{align-items:flex-start}
+.routine-list .no{margin-top:2px}
+.routine-list .info b{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.routine-list .info small{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chk{width:22px;height:22px;border-radius:11px;border:2px solid var(--line2);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--on-primary);background:transparent;transition:background-color .18s,border-color .18s}
+.chk.on{background:var(--primary);border-color:var(--primary)}
+.saved-item.picked{border-color:var(--primary);box-shadow:inset 0 0 0 1px var(--primary);background:var(--primary-c)}
+.cmp-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.cmp-head{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;padding:12px 8px;border-radius:16px;border:1px solid var(--line);background:var(--surface);position:relative}
+.cmp-head .tag{position:absolute;top:8px;left:10px;width:22px;height:22px;border-radius:7px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff}
+.cmp-head.a .tag{background:var(--primary)}.cmp-head.b .tag{background:var(--secondary)}
+.cmp-head.a{border-color:var(--primary)}.cmp-head.b{border-color:var(--secondary)}
+.cmp-head b{font-size:15px;margin-top:6px;word-break:keep-all}
+.cmp-head small{font-size:12px;color:var(--muted)}
+.lg-a{color:var(--primary);font-weight:700}.lg-b{color:var(--secondary);font-weight:700}
+.cmp-radar{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.radar{width:220px;max-width:100%;height:auto;flex-shrink:0;margin:0 auto}
+.cmp-ax{display:grid;grid-template-columns:70px auto auto 1fr;gap:8px;align-items:center;font-size:12.5px}
+.cmp-ax .n{font-weight:700}
+@media (max-width:420px){.cmp-ax{grid-template-columns:64px auto auto;gap:6px}.cmp-ax .xs{grid-column:1/-1;margin-top:-4px}}
+.msel.sm{min-height:32px;padding:0 8px;font-size:12.5px;border-radius:10px;flex:0 0 auto;width:auto;max-width:130px}
+.tour{position:fixed;inset:0;z-index:45}
+.tour-hole{position:absolute;border-radius:16px;box-shadow:0 0 0 9999px rgba(20,22,20,.55);border:2px solid var(--primary);transition:left .28s cubic-bezier(.2,.8,.2,1),top .28s cubic-bezier(.2,.8,.2,1),width .28s,height .28s;pointer-events:none}
+.tour-card{position:absolute;background:var(--surface);color:var(--text);border-radius:18px;padding:14px 14px 10px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:8px;animation:fadeUp .3s cubic-bezier(.2,.9,.25,1.04) both}
+.tour-card p{margin:0;line-height:1.5}
 </style>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -560,4 +588,5 @@ details .exp,details .tbl{animation:fadeUp .3s both}
 <div class="sheet" id="sheetSettings" role="dialog" aria-label="설정"><div class="handle"></div><div class="body" id="sheetSettingsBody"></div></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <div class="consent" id="consent" role="dialog" aria-modal="true" aria-label="시작하기 전에" hidden></div>
+<div class="tour" id="tour" hidden></div>
 <div class="sheet" id="sheetAvoid" role="dialog" aria-label="피하는 성분"><div class="handle"></div><div class="body" id="sheetAvoidBody"></div></div>
