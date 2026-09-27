@@ -483,6 +483,13 @@ details .exp,details .tbl{animation:fadeUp .3s both}
 @keyframes bannerOut{to{opacity:0;transform:translateY(-10px) scale(.98)}}
 @keyframes bannerPulse{0%{box-shadow:0 8px 24px rgba(0,0,0,.14),0 0 0 0 rgba(0,0,0,.18)}100%{box-shadow:0 8px 24px rgba(0,0,0,.14),0 0 0 10px rgba(0,0,0,0)}}
 @media (prefers-reduced-motion:reduce){.banner,.banner.fresh,.banner.out{animation:none}}
+/* 배합 헤더 합계 표시 */
+.badge.tot{font-size:13px;padding:4px 10px;border-radius:12px;font-variant-numeric:tabular-nums;min-width:82px;justify-content:center;transition:background-color .2s,color .2s}
+.badge.tot b{font-weight:800;margin-left:2px}
+.badge.tot.ok{background:var(--ok-bg);color:var(--ok-fg)}
+.badge.tot.warn{background:var(--warn-bg);color:var(--warn-fg)}
+.badge.tot.bad{background:var(--bad-bg);color:var(--bad-fg)}
+@media (max-width:460px){.badge.tot .lbl{display:none}.badge.tot{min-width:0;padding:4px 9px}.badge.tot b{margin-left:0}}
 </style>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">

@@ -506,6 +506,13 @@ details .exp,details .tbl{animation:fadeUp .3s both}
 @keyframes bannerOut{to{opacity:0;transform:translateY(-10px) scale(.98)}}
 @keyframes bannerPulse{0%{box-shadow:0 8px 24px rgba(0,0,0,.14),0 0 0 0 rgba(0,0,0,.18)}100%{box-shadow:0 8px 24px rgba(0,0,0,.14),0 0 0 10px rgba(0,0,0,0)}}
 @media (prefers-reduced-motion:reduce){.banner,.banner.fresh,.banner.out{animation:none}}
+/* 배합 헤더 합계 표시 */
+.badge.tot{font-size:13px;padding:4px 10px;border-radius:12px;font-variant-numeric:tabular-nums;min-width:82px;justify-content:center;transition:background-color .2s,color .2s}
+.badge.tot b{font-weight:800;margin-left:2px}
+.badge.tot.ok{background:var(--ok-bg);color:var(--ok-fg)}
+.badge.tot.warn{background:var(--warn-bg);color:var(--warn-fg)}
+.badge.tot.bad{background:var(--bad-bg);color:var(--bad-fg)}
+@media (max-width:460px){.badge.tot .lbl{display:none}.badge.tot{min-width:0;padding:4px 9px}.badge.tot b{margin-left:0}}
 </style>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -1787,7 +1794,7 @@ function evaluate(recipe){
   const byRole = r => items.filter(i=>ING[i.id].r===r);
   const aqueous = has('정제수') || groups.water>0 || byRole('surf').length>0;
   const cautions=[], compat=[];
-  if (Math.abs(total-100)>0.5) cautions.push({lv:'warn',t:'합계 '+fmt(total)+'%',x:'100%에 맞춰 주세요. "정제수로 100% 맞추기"를 켜면 자동으로 채워요.'});
+  if (Math.abs(total-100)>0.5) cautions.push({lv:'warn',k:'total',t:'합계 '+fmt(total)+'%',x:'100%에 맞춰 주세요. "정제수로 100% 맞추기"를 켜면 자동으로 채워요.'});
   const pres = byRole('pres');
   if (aqueous && pres.length===0) cautions.push({lv:'bad',t:'보존제가 없어요',x:'물이 들어간 배합은 며칠 안에 미생물이 자랄 수 있어요. 1,2-헥산다이올 1~2%를 넣어 주세요.'});
   else if (!aqueous) compat.push({ok:true,text:'물이 없는 무수 제형이라 보존제가 없어도 괜찮아요.'});
@@ -2161,14 +2168,14 @@ function viewMix(){
   const r = state.recipe; const t = TYPES[r.typeId]; const R = evaluate(r);
   const rows = r.items.map((it,idx)=>{ const g=ING[it.id]; if(!g) return '';
     return `<div class="irow" data-row="${esc(it.id)}"><span class="dot ${(ROLE[g.r]||ROLE.etc).g}"></span><button class="iname" data-act="open-ing" data-id="${esc(g.ko)}" data-ctx="recipe"><span>${esc(g.ko)}</span><small>${ROLE[g.r].n}</small></button><input type="range" id="sl-${idx}" min="0" max="${sliderMax(g)}" step="0.1" value="${it.pct}" data-slider="${esc(it.id)}" aria-label="${esc(g.ko)} 비율"><div class="pctwrap"><input type="number" inputmode="decimal" min="0" max="100" step="0.1" value="${fmt(it.pct)}" data-pctin="${esc(it.id)}" aria-label="${esc(g.ko)} 비율 직접 입력"><span>%</span></div><button class="iconbtn sm del" data-act="remove-ing" data-id="${esc(it.id)}" aria-label="${esc(g.ko)} 빼기">${ic('x','s')}</button></div>`; }).join('');
-  return topbar(`${t.name} 배합`, 'type', `<button class="iconbtn sm" data-act="undo" ${state.hist.length?'':'disabled'} aria-label="되돌리기" title="되돌리기">${ic('undo','s')}</button><button class="iconbtn sm" data-act="redo" ${state.redo.length?'':'disabled'} aria-label="다시하기" title="다시하기">${ic('redo','s')}</button><button class="btn text" data-act="save-recipe">저장</button>`) + `<div class="banner-anchor"><div class="banners" id="mixBanners"></div></div><div class="mix-grid"><div class="stack">
+  return topbar(`${t.name} 배합`, 'type', `${totalPillHTML(R)}<button class="iconbtn sm" data-act="undo" ${state.hist.length?'':'disabled'} aria-label="되돌리기" title="되돌리기">${ic('undo','s')}</button><button class="iconbtn sm" data-act="redo" ${state.redo.length?'':'disabled'} aria-label="다시하기" title="다시하기">${ic('redo','s')}</button><button class="btn text" data-act="save-recipe">저장</button>`) + `<div class="banner-anchor"><div class="banners" id="mixBanners"></div></div><div class="mix-grid"><div class="stack">
     <div class="row" style="flex-wrap:wrap"><span class="chip">${esc(CATS.find(c=>c.id===t.cat).name)} <span class="muted">›</span> ${esc(t.name)}</span><label class="chip" style="cursor:pointer"><input type="checkbox" id="autoBal" ${r.auto?'checked':''} style="accent-color:var(--primary);margin:0"> 정제수로 100% 맞추기</label></div>
     <div class="card beaker-card" id="beakerBox">${beakerInner(R)}</div>
     <div class="grid2"><button class="btn tonal" data-act="recommend" ${r.items.length?'':'disabled'}>${ic('wand','s')} 추천 비율 맞추기</button><button class="btn outl" data-act="ranges">${ic('info','s')} 권장 범위</button></div>
     <div class="section-title"><h2 class="h2">선택한 성분 <span class="muted" style="font-weight:500">${r.items.length}</span> <span class="xs muted" style="font-weight:400">· 숫자를 눌러 직접 입력</span></h2><button class="btn text fab-add" data-act="open-palette">${ic('plus','s')} 성분 추가</button></div>
     <div id="rows">${rows || `<div class="empty">비커가 비어 있어요. 「성분 추가」로 시작하세요.</div>`}</div>
     <div class="stack" id="warnList" style="gap:8px">${warnListHTML(R)}</div>
-    <button class="btn lg wide" data-act="nav" data-to="report" ${r.items.length?'':'disabled'}>${ic('leaf','s')} 효능·부작용 리포트 보기</button>
+    <button class="btn lg wide" data-act="to-report" ${r.items.length?'':'disabled'}>${ic('leaf','s')} 효능·부작용 리포트 보기</button>
   </div><div class="palette-host" id="paletteHost">${isDesktop()?paletteHTML():''}</div></div>`;
 }
 function warnStripHTML(R){
@@ -2178,7 +2185,7 @@ function warnStripHTML(R){
   return `<button class="status-strip ${c.lv}" data-act="warn-all" aria-label="확인 사항 ${cs.length}개 보기">${ic('warn','s')}<span class="t"><b>${esc(c.t)}</b> — ${esc(c.x)}</span>${cs.length>1?`<span class="cnt">+${cs.length-1}</span>`:(infos?`<span class="cnt">참고 ${infos}</span>`:'')}${ic('chev','xs')}</button>`;
 }
 function warnAllHTML(){
-  const R=evaluate(state.recipe); const cs=R.cautions;
+  const R=evaluate(state.recipe); const cs=R.cautions.filter(c=>c.k!=='total');
   return `<div class="between" style="align-items:flex-start"><div><h2 class="h2" style="font-size:18px">확인 사항 ${cs.filter(c=>c.lv!=='info').length}개</h2><p class="small muted">비율을 바꾸면 바로 다시 계산돼요.</p></div><button class="iconbtn sm" data-act="close-sheets" aria-label="닫기">${ic('x','s')}</button></div>
   ${cs.length?`<div class="stack" style="gap:8px">${cs.map(c=>alertHTML(c.lv,c.t,c.x)).join('')}</div>`:alertHTML('ok','','지금 배합은 규칙에 걸리는 게 없어요.')}
   ${R.compat.length?`<div class="stack" style="gap:6px;border-top:1px solid var(--line);padding-top:10px"><b class="small">잘 된 점</b>${R.compat.map(c=>`<p class="small row" style="gap:6px">${ic('check','xs')} ${esc(c.text)}</p>`).join('')}</div>`:''}
@@ -2186,6 +2193,7 @@ function warnAllHTML(){
 }
 // 배합 화면 떠 있는 알림(맥OS 알림처럼 화면 위에 팝업) — 레이아웃을 밀지 않고, 조정 중이면 계속 보이다가 멈추면 사라짐
 const MIX_AL = {shown:new Map(), timer:null, dragging:false, visible:false, userDismissed:false, flashes:[]};
+const mixCautions = R => R.cautions.filter(c=>c.lv!=='info' && c.k!=='total');
 const cautionKey = c => (c.ids&&c.ids.length ? c.ids.join(',')+'|' : '') + String(c.t).replace(/[\d.]+\s*%?/g,'#');
 const bannerHTML = (c, extra='') => `<div class="banner ${c.lv} ${extra}" data-act="warn-all" role="status"><span class="bi">${ic(c.lv==='ok'?'check':'warn','s')}</span><div class="bt"><b>${esc(c.t)}</b> — ${esc(c.x)}</div><button class="bx" data-act="banner-close" aria-label="알림 닫기">${ic('x','xs')}</button></div>`;
 function renderBanners(show){
@@ -2204,7 +2212,7 @@ function hideBanners(){ const box=$('#mixBanners'); if(!box){ MIX_AL.visible=fal
 function scheduleBannerHide(ms=4500){ clearTimeout(MIX_AL.timer); if (MIX_AL.dragging) return; MIX_AL.timer=setTimeout(hideBanners, ms); }
 function syncMixAlerts(R, opts={}){
   if (MIX_AL.dragging && !opts.force && !opts.silent) return; // 드래그 중에는 띄우지 않고, 손을 뗄 때 보여 줌
-  const cs=R.cautions.filter(c=>c.lv!=='info'); const now=Date.now(); let changed=false;
+  const cs=mixCautions(R); const now=Date.now(); let changed=false;
   const keys=new Set(cs.map(cautionKey));
   for (const [k,v] of MIX_AL.shown){ if(!keys.has(k)){ MIX_AL.shown.delete(k); changed=true; if(!opts.silent){ const f={t:v.t,at:now}; MIX_AL.flashes.push(f); setTimeout(()=>{ MIX_AL.flashes=MIX_AL.flashes.filter(x=>x!==f); if (MIX_AL.visible) renderBanners(true); }, 2200); } } }
   let textChanged=false;
@@ -2216,8 +2224,22 @@ function syncMixAlerts(R, opts={}){
   else if (want && !cs.length && MIX_AL.visible){ renderBanners(true); scheduleBannerHide(); }
   else if (textChanged && MIX_AL.visible){ renderBanners(true); scheduleBannerHide(); }
 }
+function totalPillHTML(R){
+  const d=R.total-100; const cls=Math.abs(d)<=0.5?'ok':d>0?'bad':'warn';
+  return `<span class="badge tot ${cls}" id="totalPill" title="현재 합계${cls==='ok'?'':d>0?` · ${fmt(d)}% 초과`:` · ${fmt(-d)}% 부족`}" aria-live="polite"><span class="lbl">합계</span><b class="num">${fmt(R.total)}%</b></span>`;
+}
+function totalGateHTML(R){
+  const r=state.recipe; const d=R.total-100; const hasW=r.items.some(i=>i.id==='정제수');
+  return `<div class="between" style="align-items:flex-start"><div><h2 class="h2" style="font-size:18px">합계가 ${fmt(R.total)}%예요</h2><p class="small muted">${d>0?`${fmt(d)}% 넘쳤어요.`:`${fmt(-d)}% 모자라요.`} 합계를 100%에 맞춰야 비율 계산과 리포트가 정확해요.</p></div><button class="iconbtn sm" data-act="close-sheets" aria-label="닫기">${ic('x','s')}</button></div>
+  <div class="stack" style="gap:8px">
+    ${hasW?`<button class="btn" data-act="fix-water">${ic('drop','s')} 정제수로 100% 맞추기</button>`:''}
+    <button class="btn ${hasW?'tonal':''}" data-act="recommend">${ic('wand','s')} 추천 비율로 맞추기</button>
+    <button class="btn text" data-act="report-anyway">그대로 리포트 보기</button>
+  </div>
+  <p class="xs muted">${hasW?'「정제수로 100% 맞추기」는 다른 성분은 그대로 두고 정제수 양만 조절해요. ':''}「추천 비율」은 넣은 성분 전체를 ${esc(TYPES[r.typeId].name)} 권장 범위에 맞춰 다시 배분해요.</p>`;
+}
 function warnListHTML(R){
-  const cs=R.cautions.filter(c=>c.lv!=='info'), infos=R.cautions.filter(c=>c.lv==='info');
+  const cs=mixCautions(R), infos=R.cautions.filter(c=>c.lv==='info');
   return `<div class="between"><h2 class="h3">확인 사항 <span class="muted" style="font-weight:500">${cs.length}</span></h2><button class="btn text" style="min-height:36px" data-act="warn-all">${ic('info','xs')} 잘 된 점까지 보기</button></div>
   ${cs.length?cs.map(c=>alertHTML(c.lv,c.t,c.x)).join(''):alertHTML('ok','','지금 배합은 규칙에 걸리는 게 없어요.')}${infos.map(c=>alertHTML('info',c.t,c.x)).join('')}`;
 }
@@ -2253,6 +2275,7 @@ function patchMix(){
   r.items.forEach(it=>{ const p=document.querySelector(`[data-pctin="${CSS.escape(it.id)}"]`); if(p && document.activeElement!==p) p.value=fmt(it.pct); const s=document.querySelector(`[data-slider="${CSS.escape(it.id)}"]`); if(s && Math.abs(parseFloat(s.value)-it.pct)>0.001) s.value=it.pct; });
   const u=document.querySelector('[data-act="undo"]'); if(u) u.disabled=!state.hist.length; const rd=document.querySelector('[data-act="redo"]'); if(rd) rd.disabled=!state.redo.length;
   const b=$('#beakerBox'); if(b){ const L=layerGeom(R.groups,R.total); const rects=b.querySelectorAll('rect[data-k]'); if(rects.length){ rects.forEach(r=>{ const g=L[r.dataset.k]; r.style.y=g.y+'px'; r.style.height=g.h+'px'; }); const lg=b.querySelector('.legend'); if(lg) lg.outerHTML=legendHTML(R); } else b.innerHTML=beakerInner(R); }
+  const tp=$('#totalPill'); if(tp) tp.outerHTML=totalPillHTML(R);
   const wl=$('#warnList'); if(wl){ const html=warnListHTML(R); if (wl.innerHTML!==html) wl.innerHTML=html; }
   syncMixAlerts(R);
 }
@@ -2881,6 +2904,9 @@ document.addEventListener('click', e=>{
     case 'recommend': closeSheets(); recommendMix(); break;
     case 'ranges': openInfoSheet(rangesHTML()); break;
     case 'warn-all': openInfoSheet(warnAllHTML()); break;
+    case 'to-report': { const R=evaluate(state.recipe); if (Math.abs(R.total-100)>0.5) openInfoSheet(totalGateHTML(R)); else go('report'); break; }
+    case 'fix-water': { const r=state.recipe; pushHist(); r.auto=true; balance(r); closeSheets(); const R=evaluate(r); if (Math.abs(R.total-100)<=0.5){ toast('정제수로 100%를 맞췄어요.'); go('report'); } else { render(); toast('정제수만으로는 다 못 맞췄어요. 다른 성분을 줄이거나 추천 비율을 써 보세요.'); } break; }
+    case 'report-anyway': closeSheets(); go('report'); break;
     case 'banner-close': { e.stopPropagation(); clearTimeout(MIX_AL.timer); MIX_AL.userDismissed=true; MIX_AL.flashes=[]; hideBanners(); break; }
     case 'swap-ing': { const from=d.from, to=d.to; const r=state.recipe; if(!r||!ING[to]) break; const it=r.items.find(i=>i.id===from); if(it){ pushHist(); if(r.items.some(i=>i.id===to)){ r.items=r.items.filter(i=>i!==it); } else { it.id=to; const mx=ING[to].mx; if(mx!=null&&mx>=0.01&&it.pct>mx) it.pct=mx; } balance(r); } closeSheets(); render(); toast(`${from} → ${to}(으)로 바꿨어요.`); break; }
     case 'diy-batch': state.diyBatch=+d.v; state.diyOpen=true; render(); break;
