@@ -653,13 +653,17 @@ function viewType(){
   const pick = state.pickType && TYPES[state.pickType];
   return topbar('무엇을 만들까요?', 'home') + `<div class="stack">
     <div class="chiprow">${CATS.map(c=>`<button class="chip ${c.id===state.cat?'sel':''}" data-act="pick-cat" data-id="${c.id}"><span class="dot" style="background:${CAT_COLOR[c.id]}"></span>${c.name}</button>`).join('')}</div>
-    <div class="grid2">${cat.types.map(id=>{const t=TYPES[id]; return `<button class="typecard ${state.pickType===id?'sel':''}" data-act="pick-type" data-id="${id}"><span class="typeart" style="background:color-mix(in srgb, ${CAT_COLOR[t.cat]} 16%, var(--surface2))">${containerSVG({shape:t.pack.shape,material:t.pack.material,volume:'',color:CAT_COLOR[t.cat],label:'minimal'},'')}</span><span class="n">${t.name}</span><span class="d">${t.desc}</span><span class="xs muted">기본 레시피 ${t.recipe.length}개 성분</span></button>`;}).join('')}</div>
-    ${pick ? `<div class="card stack" style="gap:12px">
+    <div class="grid2">${(()=>{
+      const COLS=2; const cards=cat.types.map(id=>{const t=TYPES[id]; return `<button class="typecard ${state.pickType===id?'sel':''}" data-act="pick-type" data-id="${id}"><span class="typeart" style="background:color-mix(in srgb, ${CAT_COLOR[t.cat]} 16%, var(--surface2))">${containerSVG({shape:t.pack.shape,material:t.pack.material,volume:'',color:CAT_COLOR[t.cat],label:'minimal'},'')}</span><span class="n">${t.name}</span><span class="d">${t.desc}</span><span class="xs muted">기본 레시피 ${t.recipe.length}개 성분</span></button>`;});
+      if (pick){ const idx=cat.types.indexOf(pick.id); const at=Math.min(cards.length-1, Math.floor(idx/COLS)*COLS+COLS-1); const col=idx%COLS;
+        const detail=`<div class="card stack typedetail" style="gap:12px;--caret:${((col+0.5)/COLS*100).toFixed(1)}%" id="typeDetail">
       <div class="between"><h2 class="h2">${esc(pick.name)} 기본 레시피</h2><span class="badge">${pick.rinse?'씻어내는 제품':'바르는 제품'}</span></div>
       <div class="wrap">${pick.recipe.map(([id,p])=>ingChip(id,{pct:p})).join('')}</div>
       <p class="small muted">성분 칩을 누르면 성분 카드가 열려요. 기본 레시피로 시작한 뒤 성분을 바꾸거나 더할 수 있어요.</p>
       <div class="grid2"><button class="btn outl" data-act="start" data-id="${pick.id}" data-mode="empty">빈 비커로 시작</button><button class="btn" data-act="start" data-id="${pick.id}" data-mode="base">기본 레시피로 시작</button></div>
-    </div>` : `<p class="small muted">종류를 고르면 기본 레시피를 미리 볼 수 있어요.</p>`}
+    </div>`; cards.splice(at+1, 0, detail); }
+      return cards.join(''); })()}</div>
+    ${pick ? '' : `<p class="small muted">종류를 고르면 기본 레시피를 미리 볼 수 있어요.</p>`}
   </div>`;
 }
 
@@ -1234,7 +1238,7 @@ document.addEventListener('click', e=>{
   switch(act){
     case 'nav': { let to=d.to; if (to==='make') to = state.recipe ? 'mix' : 'type'; const dir = d.dir || (el.closest('.bottomnav,.rail') ? 'fade' : 'forward'); if (to===state.screen && dir==='fade') { window.scrollTo({top:0,behavior:'smooth'}); break; } go(to, dir); break; }
     case 'pick-cat': state.cat=d.id; state.pickType=null; render(); break;
-    case 'pick-type': state.pickType=d.id; render(); break;
+    case 'pick-type': state.pickType=d.id; render(); { const el=$('#typeDetail'); if(el){ const r=el.getBoundingClientRect(); if (r.bottom>innerHeight-80) el.scrollIntoView({block:'nearest',behavior:'smooth'}); } } break;
     case 'start': state.recipe=newRecipe(d.id, d.mode); state.hist=[]; state.redo=[]; state.palRole='all'; state.palQ=''; go('mix'); break;
     case 'open-palette': $('#sheetPaletteBody').innerHTML=paletteHTML(); openSheet('sheetPalette'); setTimeout(()=>{ const q=$('#sheetPalette #palQ'); if(q) q.focus(); },260); break;
     case 'close-sheets': closeSheets(); break;
