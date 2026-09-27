@@ -1316,7 +1316,6 @@ function render(){
   if (['mix','report','pack','done'].includes(state.screen) && !state.recipe) state.screen='type';
   const anim = state._anim || 'none'; state._anim='';
   $('#main').innerHTML = `<div class="screen ${anim}">${VIEWS[state.screen]()}</div>`;
-  if (anim!=='none') document.querySelectorAll('#main .dcard, #main .saved-item, #main .gcard, #main .typecard, #main .sim').forEach((el,i)=>{ el.classList.add('fadeup'); el.style.setProperty('--i', Math.min(i,14)); });
   const navKey = {home:'home',type:'make',mix:'make',report:'make',pack:'make',done:'make',analyze:'analyze',saved:'saved',dict:'dict'}[state.screen];
   document.querySelectorAll('.navitem').forEach(b=>b.classList.toggle('on', b.dataset.to===navKey));
   document.title = '내 화장품 연구소';

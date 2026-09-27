@@ -381,14 +381,12 @@ details[open] summary::after{content:'−'}
 .navitem .pill{transition:background-color .2s,transform .25s cubic-bezier(.2,.9,.25,1.2)}
 .navitem.on .pill{animation:pillPop .32s cubic-bezier(.2,.9,.25,1.35)}
 @keyframes pillPop{from{transform:scale(.82)}to{transform:none}}
-.screen{animation:screenIn .3s cubic-bezier(.2,.8,.2,1) both}
-.screen.back{animation-name:screenBack}
-.screen.fade{animation-name:screenFade;animation-duration:.24s}
+/* 화면 전환: 앞으로·뒤로·탭 전환 모두 같은 효과(살짝 떠오르며 페이드) — 카드가 따로 움직이지 않음 */
+.screen{animation:screenIn .28s cubic-bezier(.2,.8,.2,1) both;transform-origin:50% 0}
+.screen.forward,.screen.back,.screen.fade{animation-name:screenIn}
 .screen.none{animation:none}
-@keyframes screenIn{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:none}}
-@keyframes screenBack{from{opacity:0;transform:translateX(-16px)}to{opacity:1;transform:none}}
-@keyframes screenFade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-.fadeup{animation:fadeUp .32s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i,0)*22ms)}
+@keyframes screenIn{from{opacity:0;transform:translateY(10px) scale(.992)}to{opacity:1;transform:none}}
+.fadeup{animation:fadeUp .3s cubic-bezier(.2,.8,.2,1) both}
 @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 #beakerBox rect[data-k]{transition:y .45s cubic-bezier(.2,.8,.2,1),height .45s cubic-bezier(.2,.8,.2,1)}
 .gauge{transition:color .25s}
@@ -2776,7 +2774,6 @@ function render(){
   if (['mix','report','pack','done'].includes(state.screen) && !state.recipe) state.screen='type';
   const anim = state._anim || 'none'; state._anim='';
   $('#main').innerHTML = `<div class="screen ${anim}">${VIEWS[state.screen]()}</div>`;
-  if (anim!=='none') document.querySelectorAll('#main .dcard, #main .saved-item, #main .gcard, #main .typecard, #main .sim').forEach((el,i)=>{ el.classList.add('fadeup'); el.style.setProperty('--i', Math.min(i,14)); });
   const navKey = {home:'home',type:'make',mix:'make',report:'make',pack:'make',done:'make',analyze:'analyze',saved:'saved',dict:'dict'}[state.screen];
   document.querySelectorAll('.navitem').forEach(b=>b.classList.toggle('on', b.dataset.to===navKey));
   document.title = '내 화장품 연구소';
