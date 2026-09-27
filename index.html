@@ -444,6 +444,21 @@ details .exp,details .tbl{animation:fadeUp .3s both}
 .avoid-list .prow{padding:6px 8px}
 .chip.av{border-color:var(--bad-line);color:var(--bad-fg)}
 .chip.av.sel{background:var(--bad-bg);color:var(--bad-fg)}
+/* 완성 제품 평가 */
+.eval-letter{width:72px;height:72px;border-radius:24px;display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0;line-height:1}
+.eval-letter b{font-size:28px;font-weight:800;letter-spacing:-.02em}
+.eval-letter span{font-size:11.5px;font-weight:600;margin-top:3px;opacity:.85}
+.eval-letter.g0{background:var(--ok-bg);color:var(--ok-fg)}.eval-letter.g1{background:var(--warn-bg);color:var(--warn-fg)}.eval-letter.g2{background:var(--bad-bg);color:var(--bad-fg)}
+.eval-axes{display:grid;grid-template-columns:1fr;gap:8px}
+.eval-ax{display:grid;grid-template-columns:76px auto 1fr;gap:10px;align-items:center;font-size:13px}
+.eval-ax .n{font-weight:700;white-space:nowrap}
+.eval-ax .w{color:var(--muted);font-size:12.5px;min-width:0;overflow-wrap:anywhere}
+.dots{display:inline-flex;gap:4px}
+.dots i{width:12px;height:12px;border-radius:6px;background:var(--surface3);display:block}
+.dots i.on{background:var(--primary)}
+.eval-cols{display:grid;grid-template-columns:1fr;gap:12px;border-top:1px solid var(--line);padding-top:10px}
+@media (min-width:600px){.eval-cols{grid-template-columns:1fr 1fr}.eval-axes{grid-template-columns:1fr 1fr;column-gap:20px}}
+@media (max-width:420px){.eval-ax{grid-template-columns:70px auto;grid-template-rows:auto auto}.eval-ax .w{grid-column:1/-1;margin-top:-2px}}
 </style>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -1732,7 +1747,7 @@ function evaluate(recipe){
   else compat.push({ok:true,text:'물이 있는 배합에 보존제가 들어 있어요.'});
   if (groups.oil>=3 && groups.water>=10 && byRole('emul').length===0 && byRole('surf').length===0) cautions.push({lv:'bad',t:'유화제가 없어요',x:'물과 오일이 함께 있는데 섞어 줄 유화제가 없어 층이 분리돼요.'});
   else if (groups.oil>=3 && groups.water>=10) compat.push({ok:true,text:'물과 오일을 섞어 줄 유화제가 있어요.'});
-  for (const it of items){ const g=ING[it.id]; if (g.mx!=null && g.mx>=0.01 && it.pct>g.mx+1e-9) cautions.push({lv:g.g===0?'warn':'bad',t:`${g.ko} ${fmt(it.pct)}%`,x:`권장 상한 ${g.mx}%를 넘었어요. ${g.d}`,ids:[g.ko]}); }
+  for (const it of items){ const g=ING[it.id]; if (t.kind==='anhydrous' && g.r==='oil') continue; if (g.mx!=null && g.mx>=0.01 && it.pct>g.mx+1e-9) cautions.push({lv:g.g===0?'warn':'bad',t:`${g.ko} ${fmt(it.pct)}%`,x:`권장 상한 ${g.mx}%를 넘었어요. ${g.d}`,ids:[g.ko]}); }
   const RET=['레티놀','레티닐팔미테이트'], ACID=['살리실릭애씨드','글라이콜릭애씨드','락틱애씨드','아젤라익애씨드','아스코빅애씨드'];
   const rIn=RET.filter(has), aIn=ACID.filter(has);
   if (rIn.length && aIn.length) cautions.push({lv:'bad',t:'레티놀 + 산 성분',x:`${rIn.join(', ')}과(와) ${aIn.join(', ')}을(를) 함께 넣었어요. 자극이 커져요. 하나는 빼거나 아침·저녁으로 나눠 쓰세요.`,ids:[...rIn,...aIn]});
@@ -1745,7 +1760,7 @@ function evaluate(recipe){
   if (al.length) cautions.push({lv:'bad',t:'알레르기 유발성분 '+al.length+'개',x:al.join(', ')+' — 식약처 고시 25종에 포함돼요. 향 알레르기가 있다면 피하세요.',ids:al});
   else compat.push({ok:true,text:'알레르기 유발성분 25종이 없어요.'});
   const roleCount={}; items.forEach(i=>{ const r=ING[i.id].r; if(['water','pres','ph','chel','antiox','thick'].includes(r)) return; roleCount[r]=(roleCount[r]||0)+1; });
-  for (const r in roleCount) if (roleCount[r]>=4) cautions.push({lv:'warn',t:ROLE[r].n+' '+roleCount[r]+'개',x:'같은 역할은 2~3개면 충분해요. 겹치는 성분을 줄이면 배합이 단순해져요.',ids:byRole(r).map(i=>i.id)});
+  for (const r in roleCount) if (roleCount[r]>=4 && !(t.kind==='anhydrous' && r==='oil')) cautions.push({lv:'warn',t:ROLE[r].n+' '+roleCount[r]+'개',x:'같은 역할은 2~3개면 충분해요. 겹치는 성분을 줄이면 배합이 단순해져요.',ids:byRole(r).map(i=>i.id)});
   for (const g in t.ranges){ const [a,b]=t.ranges[g]; const v=groups[g]||0; if (v<a-0.5 || v>b+0.5) cautions.push({lv:'warn',t:`${GROUPN[g]} ${fmt(v)}%`,x:`${t.name}은 보통 ${GROUPN[g]} ${a}~${b}%예요.`}); }
   if (byRole('uv').length) cautions.push({lv:'info',t:'자외선 차단 지수',x:'SPF·PA는 실험실 시험으로만 알 수 있어요. 집에서 만든 선크림의 차단력은 확인할 수 없어요.'});
   const grade={0:0,1:0,2:0}; items.forEach(i=>grade[ING[i.id].g]++);
@@ -2016,7 +2031,7 @@ function settingsHTML(){
   <section class="set-sec"><div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn" data-act="set-test" ${key&&!t.busy?'':'disabled'}>${t.busy?`<span class="thinking"><i></i></span> 확인 중…`:`${ic('spark','s')} 연결 테스트`}</button><button class="btn text" data-act="set-clear" ${key?'':'disabled'}>${ic('trash','s')} 키 지우기</button></div>
     ${t.st==='ok'?alertHTML('ok','연결됨',t.msg):t.st==='err'?alertHTML('bad','실패',t.msg):''}
     <p class="xs muted">키는 이 기기의 브라우저에만 저장되고, 선택한 AI 서비스 서버로만 직접 전송돼요. 다른 곳으로는 보내지 않아요.</p></section>` : ''}
-  <section class="set-sec"><div class="set-h">앱</div><div class="between"><span class="small">버전</span><span class="badge">v1.7</span></div><div class="between"><span class="small">지금 AI 상태</span>${aiStatusBadge()}</div><div class="between"><span class="small">이용 안내·면책 고지</span><button class="btn text" data-act="consent-show" style="min-height:36px">다시 보기</button></div><p class="xs muted">배합·리포트·DIY 변환·성분 사전·용기 추천은 AI 없이도 항상 동작해요.</p></section>
+  <section class="set-sec"><div class="set-h">앱</div><div class="between"><span class="small">버전</span><span class="badge">v1.8</span></div><div class="between"><span class="small">지금 AI 상태</span>${aiStatusBadge()}</div><div class="between"><span class="small">이용 안내·면책 고지</span><button class="btn text" data-act="consent-show" style="min-height:36px">다시 보기</button></div><p class="xs muted">배합·리포트·DIY 변환·성분 사전·용기 추천은 AI 없이도 항상 동작해요.</p></section>
   <div class="sheet-actions" style="grid-template-columns:1fr"><button class="btn" data-act="close-sheets">완료</button></div>`;
 }
 function refreshSettings(){ const b=$('#sheetSettingsBody'); if(b) b.innerHTML=settingsHTML(); }
@@ -2048,7 +2063,7 @@ function alertHTML(lv, title, text){ const icon = lv==='ok'?'check':lv==='info'?
 // ===== 화면: 홈 =====
 function viewHome(){
   const recent = state.saved.slice(0,3);
-  return `<header class="topbar"><div class="row" style="gap:10px;flex:1;min-width:0"><div class="rail-logo" style="width:36px;height:36px;border-radius:12px;background:var(--primary);color:var(--on-primary);display:flex;align-items:center;justify-content:center;flex-shrink:0">${ic('flask','s')}</div><h1>내 화장품 연구소</h1></div>${aiMode()?`<span class="badge g0" title="AI 켜짐">${ic('spark','xs')} AI</span>`:''}<span class="badge">v1.7</span><button class="iconbtn" data-act="settings" aria-label="설정" title="설정" style="margin-right:-8px">${ic('gear')}</button></header>
+  return `<header class="topbar"><div class="row" style="gap:10px;flex:1;min-width:0"><div class="rail-logo" style="width:36px;height:36px;border-radius:12px;background:var(--primary);color:var(--on-primary);display:flex;align-items:center;justify-content:center;flex-shrink:0">${ic('flask','s')}</div><h1>내 화장품 연구소</h1></div>${aiMode()?`<span class="badge g0" title="AI 켜짐">${ic('spark','xs')} AI</span>`:''}<span class="badge">v1.8</span><button class="iconbtn" data-act="settings" aria-label="설정" title="설정" style="margin-right:-8px">${ic('gear')}</button></header>
   <div class="stack">
     <div><div class="lead">오늘은 무엇을<br>만들어 볼까요?</div><p class="muted small">성분을 배합해 보고, 산 화장품도 읽어 보세요.</p></div>
     <div class="grid2 big2">
@@ -2067,7 +2082,8 @@ function savedItem(s, i){
   const at = new Date(s.at); const when = `${at.getMonth()+1}/${at.getDate()}`;
   if (s.k==='recipe'){
     const t=TYPES[s.typeId]; const R=evaluate(s);
-    return `<button class="saved-item" data-act="load-saved" data-i="${i}"><div class="thumb">${containerSVG(s.pack, s.name)}</div><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px"><div class="nm">${esc(s.name)}</div><div class="wrap" style="gap:4px"><span class="badge">${esc(t.name)}</span>${gradeBadges(R.grade)}</div></div><span class="xs muted">${when}</span></button>`;
+    const A=assess(s);
+    return `<button class="saved-item" data-act="load-saved" data-i="${i}"><div class="thumb">${containerSVG(s.pack, s.name)}</div><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px"><div class="nm">${esc(s.name)}</div><div class="wrap" style="gap:4px"><span class="badge">${esc(t.name)}</span><span class="badge ${A.letter[0]==='A'?'g0':A.letter==='B'?'g1':'g2'}" title="완성 제품 평가">평가 ${A.letter}</span>${gradeBadges(R.grade)}</div></div><span class="xs muted">${when}</span></button>`;
   }
   return `<button class="saved-item" data-act="load-saved" data-i="${i}"><div class="thumb">${ic('camera')}</div><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px"><div class="nm">${esc(s.name)}</div><div class="xs muted">성분표 분석 · ${s.n}개 성분</div></div><span class="xs muted">${when}</span></button>`;
 }
@@ -2191,6 +2207,97 @@ async function runAIReport(){
   state.aiBusy.report=false; if(state.screen==='report') render();
 }
 
+
+// ===== 완성 제품 평가 (규칙 기반 점수표) =====
+const AX_N = {safety:'안전성', balance:'배합 균형', efficacy:'기능성', texture:'사용감', skin:'피부 맞춤', diy:'만들기 쉬움'};
+const clamp5 = v => Math.max(1, Math.min(5, Math.round(v)));
+function assess(r){
+  const t=TYPES[r.typeId]; const R=evaluate(r); const it=R.items; const has=id=>it.some(i=>i.id===id); const pct=id=>(it.find(i=>i.id===id)||{pct:0}).pct;
+  const byRole=x=>it.filter(i=>ING[i.id].r===x); const isC=(re)=>R.cautions.filter(c=>re.test(c.t));
+  const ax={}, why={}, strengths=[], fixes=[];
+  // 안전성
+  let v=5; const g2=it.filter(i=>ING[i.id].g===2), g1=it.filter(i=>ING[i.id].g===1);
+  v-=Math.min(2,g2.length); if (g1.length>=3) v-=1; if (isC(/보존제가 없어요/).length) v-=2; if (isC(/레티놀 \+ 산/).length) v-=1;
+  const over=R.cautions.filter(c=>/권장 상한/.test(c.x)); v-=Math.min(2,over.length); if (R.allergens.length>=3) v-=1; if ((R.avoided||[]).length) v-=1;
+  ax.safety=clamp5(v);
+  why.safety = ax.safety>=4 ? (g2.length? '경고 성분이 있지만 상한 안에서 썼어요.' : '경고 성분과 상한 초과가 없어요.') : [g2.length?`경고 성분 ${g2.length}개`:'', over.length?`상한 초과 ${over.length}개`:'', isC(/보존제가 없어요/).length?'보존제 없음':'', (R.avoided||[]).length?'피하는 성분 포함':'', R.allergens.length>=3?`알레르기 유발성분 ${R.allergens.length}개`:''].filter(Boolean).join(' · ');
+  // 배합 균형
+  v=5; if (Math.abs(R.total-100)>0.5) v-=2; const outR=Object.keys(t.ranges).filter(g=>{ const [a,b]=t.ranges[g]; const x=R.groups[g]||0; return x<a-0.5||x>b+0.5; }); v-=Math.min(2,outR.length);
+  if (isC(/유화제가 없어요/).length) v-=2; if (R.cautions.some(c=>/같은 역할은/.test(c.x))) v-=1; if (it.length<3) v-=1;
+  ax.balance=clamp5(v);
+  why.balance = ax.balance>=4 ? `${t.name} 권장 범위를 ${outR.length?'거의 ':''}지켰어요.` : [Math.abs(R.total-100)>0.5?`합계 ${fmt(R.total)}%`:'', outR.length?`범위 밖 그룹 ${outR.map(g=>GROUPN[g]).join('·')}`:'', isC(/유화제가 없어요/).length?'유화제 없음':'', it.length<3?'성분이 너무 적음':''].filter(Boolean).join(' · ');
+  // 기능성
+  const acts=[...byRole('act'),...byRole('uv')]; const surf=byRole('surf');
+  if (t.kind==='anhydrous'){ v = 3; if (byRole('antiox').length) v+=1; if (acts.length) v+=1; if (t.rinse && !byRole('emul').length && !surf.length) v-=1; }
+  else if (t.kind==='wash' || surf.length>=2){ v = surf.length? 3 : 1; if (surf.length && surf.every(i=>ING[i.id].g===0)) v+=1; if (byRole('hum').length||byRole('cond').length) v+=1; }
+  else { v = [1,2,3,4,5][Math.min(4,acts.length)]; if (R.benefits.length>=3 && v<5) v+=1; if (acts.length && acts.every(i=>i.pct<0.2)) v-=1; }
+  ax.efficacy=clamp5(v);
+  why.efficacy = acts.length ? `기능 성분 ${acts.length}개(${acts.slice(0,3).map(i=>i.id).join(', ')}${acts.length>3?' 외':''})` : (surf.length ? `세정 성분 ${surf.length}개${surf.every(i=>ING[i.id].g===0)?', 모두 순한 편':''}` : (t.kind==='anhydrous' ? `오일·왁스 ${byRole('oil').length}종${byRole('antiox').length?' + 산화방지제':''}${t.rinse?(byRole('emul').length?' + 유화제(물로 헹굼)':' · 유화제가 없어 물로 잘 안 씻겨요'):''}` : '뚜렷한 기능 성분이 없어 기본 보습 위주예요.'));
+  // 사용감
+  v=3; const oil=R.groups.oil||0; const heavy=['페트롤라툼','미네랄오일','시어버터','코코넛오일','라놀린'].filter(has).reduce((s,id)=>s+pct(id),0);
+  const okOil = !t.ranges.oil || (oil>=t.ranges.oil[0]-0.5 && oil<=t.ranges.oil[1]+0.5); if (okOil) v+=1;
+  if (t.kind==='emulsion' && (byRole('thick').length||byRole('emul').length)) v+=1; if (t.kind==='aq' && byRole('thick').length) v+=1;
+  if (heavy>10 && t.kind!=='anhydrous') v-=1; if (pct('에탄올')>10) v-=1; if (byRole('frag').reduce((s,i)=>s+i.pct,0)>1) v-=1;
+  ax.texture=clamp5(v);
+  const tex = t.kind==='wash'||surf.length>=2 ? (surf.reduce((s,i)=>s+i.pct,0)>=15?'풍성한 거품의':'부드러운 거품의') : t.kind==='anhydrous' ? (byRole('oil').some(i=>/왁스/.test(i.id))?'단단하게 발리는 밤 타입의':'오일리하고 윤기 나는') : oil>=25?'묵직하고 리치한':oil>=12?'부드럽고 촉촉한':oil>=3?'가볍고 산뜻한':'물처럼 가벼운';
+  const finish = it.some(i=>/메티콘|실록세인/.test(i.id))?' 매끄러운 마무리':(byRole('powder').length?' 보송한 마무리':(pct('에탄올')>=5?' 산뜻하지만 살짝 건조할 수 있는 마무리':''));
+  why.texture = `${tex} 질감${finish?','+finish:''}${byRole('frag').length?'':' · 무향'}`;
+  // 피부 맞춤
+  if (state.skin){ const sk=R.skin[state.skin]; v = sk[1]==='g0' ? (sk[0]==='잘 맞음'?5:4) : 2; if ((R.avoided||[]).length) v-=1; why.skin=`내 피부(${skinName()}): ${sk[0]}${(R.avoided||[]).length?' · 피하는 성분 포함':''}`; }
+  else { const good=Object.values(R.skin).filter(x=>x[1]==='g0').length; v = good>=4?4:good>=2?3:2; why.skin='홈에서 「내 피부」를 고르면 나에게 맞춰 평가해요.'; }
+  ax.skin=clamp5(v);
+  // 만들기 쉬움
+  const diyOk=it.filter(i=>ING[i.id].diy>=1).length; const ratio=it.length?diyOk/it.length:0; v = ratio>=0.9?5:ratio>=0.7?4:ratio>=0.5?3:ratio>=0.3?2:1; if (byRole('uv').length) v=Math.min(v,2);
+  ax.diy=clamp5(v);
+  why.diy = byRole('uv').length ? '선크림은 차단력을 확인할 수 없어 집에서 만들기를 권하지 않아요.' : (ratio>=0.9?'모든 성분을 초보용 원료로 구할 수 있어요.':`${it.length-diyOk}개 성분은 DIY 변환에서 대체되거나 빠져요.`);
+  // 종합
+  const Wt={safety:.3,balance:.25,efficacy:.15,texture:.1,skin:.1,diy:.1}; const score=Object.keys(Wt).reduce((s,k)=>s+ax[k]*Wt[k],0);
+  const pts=Math.round(score*20); const letter = score>=4.5?'A+':score>=4?'A':score>=3.3?'B':score>=2.5?'C':'D';
+  const verdict = letter==='A+' ? `군더더기 없이 잘 짜인 ${t.name}이에요. 이대로 만들어도 좋아요.` : letter==='A' ? `균형 잡힌 ${t.name}이에요. 아래 한두 가지만 손보면 더 좋아져요.` : letter==='B' ? `쓸 만한 ${t.name}이지만 보완할 점이 있어요.` : letter==='C' ? `기본은 갖췄지만 안전성이나 균형에서 고칠 점이 여럿이에요.` : `이대로 만들기엔 위험 요소가 있어요. 「보완할 점」부터 고쳐 주세요.`;
+  // 강점 · 보완
+  if (ax.safety>=4) strengths.push(g2.length?'경고 성분을 상한 안에서만 썼어요':'경고 성분과 상한 초과가 없어요');
+  if (R.compat.some(c=>/보존제가 들어/.test(c.text))) strengths.push('물이 있는 배합에 보존제를 갖췄어요');
+  if (!R.allergens.length && byRole('frag').length===0) strengths.push('향료와 알레르기 유발성분이 없어 민감 피부에도 부담이 적어요'); else if (!R.allergens.length) strengths.push('알레르기 유발성분 25종이 없어요');
+  if (ax.balance>=4) strengths.push(`${t.name} 권장 범위에 맞는 비율이에요`);
+  if (acts.length>=2) strengths.push(`${acts.slice(0,3).map(i=>i.id).join('·')} 등 기능 성분이 알차요`);
+  if (ax.diy>=4 && !byRole('uv').length) strengths.push('초보용 원료로 그대로 만들 수 있어요');
+  if (state.skin && ax.skin>=4) strengths.push(`${skinName()} 피부에 잘 맞는 구성이에요`);
+  R.cautions.filter(c=>c.lv!=='info').slice(0,4).forEach(c=>fixes.push(`${c.t} — ${c.x}`));
+  if (ax.efficacy<=2 && !(t.kind==='wash'||surf.length>=2)) fixes.push(`기능 성분이 없어요 — ${t.kind==='anhydrous'?'토코페롤 0.5%(산화 방지)나 바쿠치올 같은 지용성 성분을 더해 보세요.':t.rinse?'씻어내는 제품이라도 판테놀·알란토인 같은 진정 성분을 0.5% 정도 더해 보세요.':'나이아신아마이드 2~4%나 판테놀 1% 같은 검증된 성분을 하나 더해 보세요.'}`);
+  if (state.skin && ax.skin<=2) fixes.push(`내 피부(${skinName()}) — ${skinAdvice(R,state.skin)}`);
+  if (!fixes.length) fixes.push('크게 고칠 점이 없어요. 만든 뒤 팔 안쪽 48시간 패치 테스트만 잊지 마세요.');
+  const fit = Object.entries(R.skin).filter(([k,x])=>x[1]==='g0').map(([k])=>({dry:'건성',normal:'중성',oily:'지성',sens:'민감'}[k]));
+  return {ax, why, score, pts, letter, verdict, strengths:strengths.slice(0,4), fixes:fixes.slice(0,4), texture:why.texture, fit};
+}
+function assessHTML(r){
+  const A=assess(r); const key=recipeKey(r); const ai=state.aiEval&&state.aiEval[key] || cacheGet('eval|'+hashStr(key));
+  const lcls = A.letter[0]==='A'?'g0':A.letter==='B'?'g1':'g2';
+  const dots = n => `<span class="dots" aria-label="${n}점">${[1,2,3,4,5].map(i=>`<i class="${i<=n?'on':''}"></i>`).join('')}</span>`;
+  return `<div class="card stack" style="gap:12px" id="evalCard">
+    <div class="row" style="gap:14px;align-items:center"><div class="eval-letter ${lcls}"><b>${A.letter}</b><span>${A.pts}점</span></div><div class="stack" style="gap:4px;flex:1;min-width:0"><h3 class="h3">완성 제품 평가</h3><p class="small">${esc(A.verdict)}</p></div></div>
+    <div class="eval-axes">${Object.keys(AX_N).map(k=>`<div class="eval-ax"><span class="n">${AX_N[k]}</span>${dots(A.ax[k])}<span class="w">${esc(A.why[k])}</span></div>`).join('')}</div>
+    <div class="eval-cols">
+      <div class="stack" style="gap:6px"><b class="small" style="color:var(--ok-fg)">${ic('check','xs')} 강점</b>${A.strengths.length?A.strengths.map(x=>`<p class="small row" style="align-items:flex-start;gap:6px">${ic('check','xs')}<span>${esc(x)}</span></p>`).join(''):'<p class="small muted">아직 뚜렷한 강점이 없어요.</p>'}</div>
+      <div class="stack" style="gap:6px"><b class="small" style="color:var(--warn-fg)">${ic('warn','xs')} 보완할 점</b>${A.fixes.map(x=>`<p class="small row" style="align-items:flex-start;gap:6px">${ic('warn','xs')}<span>${esc(x)}</span></p>`).join('')}</div>
+    </div>
+    <div class="tip">${ic('drop','s')}<div><b>예상 사용감</b> — ${esc(A.texture)}<br><b>잘 맞는 피부</b> — ${A.fit.length?esc(A.fit.join(', ')):'특별히 권할 피부 타입이 없어요'}</div></div>
+    ${aiOn() ? `<div class="between"><span class="small muted">${ai?'AI 총평':'AI에게 한 번 더 물어볼까요?'}</span>${state.aiBusy.eval?`<button class="btn text" data-act="ai-stop" data-k="eval">${ic('stop','s')} 멈추기</button>`:`<button class="btn tonal" style="min-height:38px;padding:0 14px;font-size:13px" data-act="ai-eval" ${aiLeft()?'':'disabled'}>${ic('spark','s')} ${ai?'다시 듣기':'AI 총평 듣기'}</button>`}</div><div class="ai-box small" id="aiEval">${ai?esc(ai):''}</div>${state.aiBusy.eval&&!ai?`<span class="thinking"><i></i>평가하는 중…</span>`:''}` : ''}
+    <p class="footnote">이 앱의 규칙으로 매긴 참고용 점수예요. 실제 품질은 원료 등급·제조 환경·보관에 따라 달라지고, 피부 반응은 사람마다 달라요.</p>
+  </div>`;
+}
+function evalPrompt(r, A, R){
+  const t=TYPES[r.typeId];
+  return `당신은 화장품 배합을 초보자에게 평가해 주는 조제 전문가입니다. 아래는 사용자가 앱에서 가상으로 배합한 ${t.name}과, 앱이 규칙으로 매긴 점수표입니다. 이 정보만 근거로 한국어 존댓말로 총평을 써 주세요.\n\n[레시피: ${r.name}]\n${R.items.map(i=>`- ${i.id} (${ING[i.id].inci}) ${fmt(i.pct)}% · ${ROLE[ING[i.id].r].n} · 앱 등급 ${GRADE[ING[i.id].g]}`).join('\n')}\n\n[앱 점수표] 종합 ${A.letter}(${A.pts}점)\n${Object.keys(AX_N).map(k=>`- ${AX_N[k]} ${A.ax[k]}/5: ${A.why[k]}`).join('\n')}\n[강점] ${A.strengths.join(' / ')||'없음'}\n[보완할 점] ${A.fixes.join(' / ')}\n\n[형식] 소제목 없이 3개 문단, 전체 400자 이내. 1문단: 이 제품이 어떤 사람에게 어떤 느낌일지. 2문단: 가장 먼저 고칠 한 가지와 구체적인 수치. 3문단: 실제로 만들 때 주의할 점 한 가지. 마크다운 기호는 쓰지 말고, 치료·완치 같은 의약품 표현은 피하고, 모르는 것은 "자료 없음"이라고 하세요.`;
+}
+async function runAIEval(){
+  const r=state.recipe; const R=evaluate(r); const A=assess(r); const key=recipeKey(r); const ck='eval|'+hashStr(key);
+  state.aiEval=state.aiEval||{}; const ctl=new AbortController(); state.ctl.eval=ctl; state.aiBusy.eval=true; render();
+  try{
+    const {text}=await aiCall('text', evalPrompt(r,A,R), {signal:ctl.signal, onText:({text})=>{ const b=$('#aiEval'); if(b){ b.textContent=soften(text); const th=b.parentElement.querySelector('.thinking'); if(th) th.remove(); } }});
+    state.aiEval[key]=soften(text); cacheSet(ck, state.aiEval[key]);
+  }catch(e){ if(e.text) state.aiEval[key]=soften(e.text)+'\n(중단됨)'; if(e.code!=='cancelled') toast(errMsg(e)); }
+  state.aiBusy.eval=false; if(state.screen==='done') render();
+}
 // ===== 화면: 용기·포장 =====
 function viewPack(){
   const r=state.recipe; const t=TYPES[r.typeId]; const p=r.pack; const R=evaluate(r);
@@ -2232,6 +2339,7 @@ function viewDone(){
       <div class="grid2" style="width:100%"><button class="btn outl" data-act="nav" data-to="mix" data-dir="back">배합 수정</button><button class="btn" data-act="save-recipe">보관함에 저장</button></div>
       <div class="row" style="justify-content:center;flex-wrap:wrap"><button class="btn text" data-act="copy-recipe">${ic('copy','s')} 레시피 텍스트 복사</button>${(state.downloads||!inClaude())?`<button class="btn text" data-act="save-card-image">${ic('image','s')} 카드 이미지 저장</button>`:''}${state.cloud.db&&state.cloud.uid?`<button class="btn text" data-act="gallery-publish">${ic('globe','s')} 갤러리에 공개</button>`:''}</div></div>
     <div class="row" style="justify-content:center;flex-wrap:wrap"><span class="xs muted">라벨 스타일</span>${Object.entries(LABEL_STYLES).map(([k,n])=>`<button class="chip sm ${(r.pack.label||'minimal')===k?'sel':''}" data-act="pack" data-k="label" data-v="${k}">${n}</button>`).join('')}<span class="xs muted" style="margin-left:6px">색</span>${LABEL_COLORS.map(c=>`<button class="sw ${r.pack.color===c?'sel':''}" style="background:${c};width:22px;height:22px" data-act="pack" data-k="color" data-v="${c}" aria-label="라벨 색 ${c}"></button>`).join('')}</div>
+    ${assessHTML(r)}
     <div class="card stack" style="gap:10px" id="simCard"><div class="between"><div class="row">${ic('search','s')}<h3 class="h3">비슷한 시중 제품</h3></div>${aiOn()?(state.aiBusy.similar?`<span class="thinking"><i></i>찾는 중…</span>`:`<button class="btn text" data-act="ai-similar" ${aiLeft()?'':'disabled'}>${ic('spark','s')} ${sim?'AI로 다시 찾기':'AI로 더 찾기'}</button>`):''}</div>
       ${offline.length ? offline.map(s=>`<div class="sim"><div class="between"><b>${esc(s.brand)} ${esc(s.name)}</b><a class="link-out" href="https://www.google.com/search?q=${encodeURIComponent(s.brand+' '+s.name)}" target="_blank" rel="noopener">검색 ↗</a></div><p class="xs muted">${esc(TYPES[s.type]?TYPES[s.type].name:'')}${s.mine?' · 내가 분석한 제품':''} · 공통 성분 ${s.shared.length}개</p><div class="wrap">${s.shared.slice(0,5).map(id=>ingChip(id)).join('')}</div></div>`).join('') : `<p class="small muted">대표 성분이 겹치는 제품을 카탈로그에서 찾지 못했어요.</p>`}
       <p class="footnote">데모 카탈로그(${SEED_PRODUCTS.length}개 제품, 대표 성분 몇 가지 기준)와 내가 분석한 제품에서 공통 성분이 많은 순으로 골랐어요. 광고가 아니며, 정식 버전은 전성분 DB로 대체해요.</p>
@@ -2690,6 +2798,7 @@ document.addEventListener('click', e=>{
     case 'save-recipe': saveRecipe(); render(); break;
     case 'save-analysis': saveAnalysis(); break;
     case 'ai-report': runAIReport(); break;
+    case 'ai-eval': runAIEval(); break;
     case 'ai-enable': enableAI(); break;
     case 'settings': openSettings(); break;
     case 'consent-ok': acceptConsent(); break;

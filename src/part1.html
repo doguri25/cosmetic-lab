@@ -421,6 +421,21 @@ details .exp,details .tbl{animation:fadeUp .3s both}
 .avoid-list .prow{padding:6px 8px}
 .chip.av{border-color:var(--bad-line);color:var(--bad-fg)}
 .chip.av.sel{background:var(--bad-bg);color:var(--bad-fg)}
+/* 완성 제품 평가 */
+.eval-letter{width:72px;height:72px;border-radius:24px;display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0;line-height:1}
+.eval-letter b{font-size:28px;font-weight:800;letter-spacing:-.02em}
+.eval-letter span{font-size:11.5px;font-weight:600;margin-top:3px;opacity:.85}
+.eval-letter.g0{background:var(--ok-bg);color:var(--ok-fg)}.eval-letter.g1{background:var(--warn-bg);color:var(--warn-fg)}.eval-letter.g2{background:var(--bad-bg);color:var(--bad-fg)}
+.eval-axes{display:grid;grid-template-columns:1fr;gap:8px}
+.eval-ax{display:grid;grid-template-columns:76px auto 1fr;gap:10px;align-items:center;font-size:13px}
+.eval-ax .n{font-weight:700;white-space:nowrap}
+.eval-ax .w{color:var(--muted);font-size:12.5px;min-width:0;overflow-wrap:anywhere}
+.dots{display:inline-flex;gap:4px}
+.dots i{width:12px;height:12px;border-radius:6px;background:var(--surface3);display:block}
+.dots i.on{background:var(--primary)}
+.eval-cols{display:grid;grid-template-columns:1fr;gap:12px;border-top:1px solid var(--line);padding-top:10px}
+@media (min-width:600px){.eval-cols{grid-template-columns:1fr 1fr}.eval-axes{grid-template-columns:1fr 1fr;column-gap:20px}}
+@media (max-width:420px){.eval-ax{grid-template-columns:70px auto;grid-template-rows:auto auto}.eval-ax .w{grid-column:1/-1;margin-top:-2px}}
 </style>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
