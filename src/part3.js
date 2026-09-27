@@ -673,13 +673,13 @@ function viewMix(){
   const r = state.recipe; const t = TYPES[r.typeId]; const R = evaluate(r);
   const rows = r.items.map((it,idx)=>{ const g=ING[it.id]; if(!g) return '';
     return `<div class="irow" data-row="${esc(it.id)}"><span class="dot ${(ROLE[g.r]||ROLE.etc).g}"></span><button class="iname" data-act="open-ing" data-id="${esc(g.ko)}" data-ctx="recipe"><span>${esc(g.ko)}</span><small>${ROLE[g.r].n}</small></button><input type="range" id="sl-${idx}" min="0" max="${sliderMax(g)}" step="0.1" value="${it.pct}" data-slider="${esc(it.id)}" aria-label="${esc(g.ko)} 비율"><div class="pctwrap"><input type="number" inputmode="decimal" min="0" max="100" step="0.1" value="${fmt(it.pct)}" data-pctin="${esc(it.id)}" aria-label="${esc(g.ko)} 비율 직접 입력"><span>%</span></div><button class="iconbtn sm del" data-act="remove-ing" data-id="${esc(it.id)}" aria-label="${esc(g.ko)} 빼기">${ic('x','s')}</button></div>`; }).join('');
-  return topbar(`${t.name} 배합`, 'type', `<button class="iconbtn sm" data-act="undo" ${state.hist.length?'':'disabled'} aria-label="되돌리기" title="되돌리기">${ic('undo','s')}</button><button class="iconbtn sm" data-act="redo" ${state.redo.length?'':'disabled'} aria-label="다시하기" title="다시하기">${ic('redo','s')}</button><button class="btn text" data-act="save-recipe">저장</button>`) + `<div class="mix-grid"><div class="stack">
+  return topbar(`${t.name} 배합`, 'type', `<button class="iconbtn sm" data-act="undo" ${state.hist.length?'':'disabled'} aria-label="되돌리기" title="되돌리기">${ic('undo','s')}</button><button class="iconbtn sm" data-act="redo" ${state.redo.length?'':'disabled'} aria-label="다시하기" title="다시하기">${ic('redo','s')}</button><button class="btn text" data-act="save-recipe">저장</button>`) + `<div class="banner-anchor"><div class="banners" id="mixBanners"></div></div><div class="mix-grid"><div class="stack">
     <div class="row" style="flex-wrap:wrap"><span class="chip">${esc(CATS.find(c=>c.id===t.cat).name)} <span class="muted">›</span> ${esc(t.name)}</span><label class="chip" style="cursor:pointer"><input type="checkbox" id="autoBal" ${r.auto?'checked':''} style="accent-color:var(--primary);margin:0"> 정제수로 100% 맞추기</label></div>
     <div class="card beaker-card" id="beakerBox">${beakerInner(R)}</div>
     <div class="grid2"><button class="btn tonal" data-act="recommend" ${r.items.length?'':'disabled'}>${ic('wand','s')} 추천 비율 맞추기</button><button class="btn outl" data-act="ranges">${ic('info','s')} 권장 범위</button></div>
-    <div id="warnBox">${warnStripHTML(R)}</div>
     <div class="section-title"><h2 class="h2">선택한 성분 <span class="muted" style="font-weight:500">${r.items.length}</span> <span class="xs muted" style="font-weight:400">· 숫자를 눌러 직접 입력</span></h2><button class="btn text fab-add" data-act="open-palette">${ic('plus','s')} 성분 추가</button></div>
     <div id="rows">${rows || `<div class="empty">비커가 비어 있어요. 「성분 추가」로 시작하세요.</div>`}</div>
+    <div class="stack" id="warnList" style="gap:8px">${warnListHTML(R)}</div>
     <button class="btn lg wide" data-act="nav" data-to="report" ${r.items.length?'':'disabled'}>${ic('leaf','s')} 효능·부작용 리포트 보기</button>
   </div><div class="palette-host" id="paletteHost">${isDesktop()?paletteHTML():''}</div></div>`;
 }
@@ -695,6 +695,42 @@ function warnAllHTML(){
   ${cs.length?`<div class="stack" style="gap:8px">${cs.map(c=>alertHTML(c.lv,c.t,c.x)).join('')}</div>`:alertHTML('ok','','지금 배합은 규칙에 걸리는 게 없어요.')}
   ${R.compat.length?`<div class="stack" style="gap:6px;border-top:1px solid var(--line);padding-top:10px"><b class="small">잘 된 점</b>${R.compat.map(c=>`<p class="small row" style="gap:6px">${ic('check','xs')} ${esc(c.text)}</p>`).join('')}</div>`:''}
   <div class="sheet-actions" style="grid-template-columns:1fr"><button class="btn tonal" data-act="close-sheets">닫기</button></div>`;
+}
+// 배합 화면 떠 있는 알림(맥OS 알림처럼 화면 위에 팝업) — 레이아웃을 밀지 않고, 조정 중이면 계속 보이다가 멈추면 사라짐
+const MIX_AL = {shown:new Map(), timer:null, dragging:false, visible:false, userDismissed:false, flashes:[]};
+const cautionKey = c => (c.ids&&c.ids.length ? c.ids.join(',')+'|' : '') + String(c.t).replace(/[\d.]+\s*%?/g,'#');
+const bannerHTML = (c, extra='') => `<div class="banner ${c.lv} ${extra}" data-act="warn-all" role="status"><span class="bi">${ic(c.lv==='ok'?'check':'warn','s')}</span><div class="bt"><b>${esc(c.t)}</b> — ${esc(c.x)}</div><button class="bx" data-act="banner-close" aria-label="알림 닫기">${ic('x','xs')}</button></div>`;
+function renderBanners(show){
+  const box=$('#mixBanners'); if(!box) return;
+  if (!show){ box.innerHTML=''; MIX_AL.visible=false; return; }
+  const list=[...MIX_AL.shown.values()].sort((a,b)=>b.at-a.at);
+  const top=list.slice(0,3); const more=list.length-top.length;
+  box.innerHTML = [
+    ...MIX_AL.flashes.map(f=>bannerHTML({lv:'ok',t:'해결됐어요',x:f.t},'flash')),
+    ...top.map(c=>bannerHTML(c, c.fresh?'fresh':'')),
+    more>0?`<button class="banner more" data-act="warn-all">${ic('chev','xs')} 확인 사항 ${more}개 더 보기</button>`:''
+  ].join('');
+  top.forEach(c=>c.fresh=false); MIX_AL.visible = !!(top.length||MIX_AL.flashes.length);
+}
+function hideBanners(){ const box=$('#mixBanners'); if(!box){ MIX_AL.visible=false; return; } box.querySelectorAll('.banner').forEach(el=>el.classList.add('out')); setTimeout(()=>renderBanners(false), 230); }
+function scheduleBannerHide(ms=4500){ clearTimeout(MIX_AL.timer); if (MIX_AL.dragging) return; MIX_AL.timer=setTimeout(hideBanners, ms); }
+function syncMixAlerts(R, opts={}){
+  const cs=R.cautions.filter(c=>c.lv!=='info'); const now=Date.now(); let changed=false;
+  const keys=new Set(cs.map(cautionKey));
+  for (const [k,v] of MIX_AL.shown){ if(!keys.has(k)){ MIX_AL.shown.delete(k); changed=true; if(!opts.silent){ const f={t:v.t,at:now}; MIX_AL.flashes.push(f); setTimeout(()=>{ MIX_AL.flashes=MIX_AL.flashes.filter(x=>x!==f); if (MIX_AL.visible) renderBanners(true); }, 2200); } } }
+  let textChanged=false;
+  cs.forEach(c=>{ const k=cautionKey(c); const p=MIX_AL.shown.get(k); if(!p){ MIX_AL.shown.set(k,{lv:c.lv,t:c.t,x:c.x,at:now,fresh:!opts.silent}); changed=true; } else if(p.lv!==c.lv){ Object.assign(p,{lv:c.lv,t:c.t,x:c.x,at:now,fresh:!opts.silent}); changed=true; } else if(p.x!==c.x||p.t!==c.t){ Object.assign(p,{t:c.t,x:c.x}); textChanged=true; } });
+  if (opts.silent) return;
+  if (changed) MIX_AL.userDismissed=false;
+  const want = (changed || opts.force || (!MIX_AL.visible && cs.length && !MIX_AL.userDismissed));
+  if (want && (cs.length||MIX_AL.flashes.length)){ renderBanners(true); scheduleBannerHide(); }
+  else if (want && !cs.length && MIX_AL.visible){ renderBanners(true); scheduleBannerHide(); }
+  else if (textChanged && MIX_AL.visible){ renderBanners(true); scheduleBannerHide(); }
+}
+function warnListHTML(R){
+  const cs=R.cautions.filter(c=>c.lv!=='info'), infos=R.cautions.filter(c=>c.lv==='info');
+  return `<div class="between"><h2 class="h3">확인 사항 <span class="muted" style="font-weight:500">${cs.length}</span></h2><button class="btn text" style="min-height:36px" data-act="warn-all">${ic('info','xs')} 잘 된 점까지 보기</button></div>
+  ${cs.length?cs.map(c=>alertHTML(c.lv,c.t,c.x)).join(''):alertHTML('ok','','지금 배합은 규칙에 걸리는 게 없어요.')}${infos.map(c=>alertHTML('info',c.t,c.x)).join('')}`;
 }
 function legendHTML(R){
   const g=R.groups; const diff=R.total-100;
@@ -728,7 +764,8 @@ function patchMix(){
   r.items.forEach(it=>{ const p=document.querySelector(`[data-pctin="${CSS.escape(it.id)}"]`); if(p && document.activeElement!==p) p.value=fmt(it.pct); const s=document.querySelector(`[data-slider="${CSS.escape(it.id)}"]`); if(s && Math.abs(parseFloat(s.value)-it.pct)>0.001) s.value=it.pct; });
   const u=document.querySelector('[data-act="undo"]'); if(u) u.disabled=!state.hist.length; const rd=document.querySelector('[data-act="redo"]'); if(rd) rd.disabled=!state.redo.length;
   const b=$('#beakerBox'); if(b){ const L=layerGeom(R.groups,R.total); const rects=b.querySelectorAll('rect[data-k]'); if(rects.length){ rects.forEach(r=>{ const g=L[r.dataset.k]; r.style.y=g.y+'px'; r.style.height=g.h+'px'; }); const lg=b.querySelector('.legend'); if(lg) lg.outerHTML=legendHTML(R); } else b.innerHTML=beakerInner(R); }
-  const w=$('#warnBox'); if(w){ const html=warnStripHTML(R); if (w.innerHTML!==html) w.innerHTML=html; }
+  const wl=$('#warnList'); if(wl){ const html=warnListHTML(R); if (wl.innerHTML!==html) wl.innerHTML=html; }
+  syncMixAlerts(R);
 }
 
 // ===== 화면: 리포트 =====
@@ -1328,6 +1365,7 @@ function render(){
   if (['mix','report','pack','done'].includes(state.screen) && !state.recipe) state.screen='type';
   const anim = state._anim || 'none'; state._anim='';
   $('#main').innerHTML = `<div class="screen ${anim}">${VIEWS[state.screen]()}</div>`;
+  if (state.screen==='mix' && state.recipe){ const R=evaluate(state.recipe); if (anim!=='none'){ MIX_AL.shown.clear(); MIX_AL.flashes=[]; MIX_AL.visible=false; MIX_AL.userDismissed=false; syncMixAlerts(R,{force:true}); } else { const wasVisible=MIX_AL.visible; syncMixAlerts(R,{silent:true}); if (wasVisible) renderBanners(true); } } else { clearTimeout(MIX_AL.timer); MIX_AL.visible=false; }
   const navKey = {home:'home',type:'make',mix:'make',report:'make',pack:'make',done:'make',analyze:'analyze',saved:'saved',dict:'dict'}[state.screen];
   document.querySelectorAll('.navitem').forEach(b=>b.classList.toggle('on', b.dataset.to===navKey));
   document.title = '내 화장품 연구소';
@@ -1354,6 +1392,7 @@ document.addEventListener('click', e=>{
     case 'recommend': closeSheets(); recommendMix(); break;
     case 'ranges': openInfoSheet(rangesHTML()); break;
     case 'warn-all': openInfoSheet(warnAllHTML()); break;
+    case 'banner-close': { e.stopPropagation(); clearTimeout(MIX_AL.timer); MIX_AL.userDismissed=true; MIX_AL.flashes=[]; hideBanners(); break; }
     case 'swap-ing': { const from=d.from, to=d.to; const r=state.recipe; if(!r||!ING[to]) break; const it=r.items.find(i=>i.id===from); if(it){ pushHist(); if(r.items.some(i=>i.id===to)){ r.items=r.items.filter(i=>i!==it); } else { it.id=to; const mx=ING[to].mx; if(mx!=null&&mx>=0.01&&it.pct>mx) it.pct=mx; } balance(r); } closeSheets(); render(); toast(`${from} → ${to}(으)로 바꿨어요.`); break; }
     case 'diy-batch': state.diyBatch=+d.v; state.diyOpen=true; render(); break;
     case 'copy-inci': copyText(inciText(state.recipe)); break;
@@ -1407,7 +1446,7 @@ document.addEventListener('click', e=>{
 });
 document.addEventListener('input', e=>{
   const t=e.target;
-  if (t.matches('[data-slider]') && state.recipe){ const id=t.dataset.slider; if(state._dragId!==id){ pushHist(); state._dragId=id; } const v=applyPct(id, t.value); if (Math.abs(parseFloat(t.value)-v)>0.001) t.value=v; const row=t.closest('.irow'); const y0=row?row.getBoundingClientRect().top:0; patchMix(); if(row){ const dy=row.getBoundingClientRect().top-y0; if (Math.abs(dy)>0.5) window.scrollBy(0, dy); } }
+  if (t.matches('[data-slider]') && state.recipe){ const id=t.dataset.slider; MIX_AL.dragging=true; clearTimeout(MIX_AL.timer); if(state._dragId!==id){ pushHist(); state._dragId=id; } const v=applyPct(id, t.value); if (Math.abs(parseFloat(t.value)-v)>0.001) t.value=v; const row=t.closest('.irow'); const y0=row?row.getBoundingClientRect().top:0; patchMix(); if(row){ const dy=row.getBoundingClientRect().top-y0; if (Math.abs(dy)>0.5) window.scrollBy(0, dy); } }
   else if (t.id==='palQ'){ state.palQ=t.value; refreshPalette(); }
   else if (t.id==='avoidQ'){ state.avoidQ=t.value; const pos=t.selectionStart; refreshAvoidSheet(); const q=$('#avoidQ'); if(q){ q.focus(); try{ q.setSelectionRange(pos,pos); }catch(e){} } }
   else if (t.id==='dictQ'){ state.dictQ=t.value; const l=$('#dictList'); if(l){ const pos=t.selectionStart; render(); const q=$('#dictQ'); if(q){ q.focus(); try{ q.setSelectionRange(pos,pos); }catch(e){} } } }
@@ -1418,7 +1457,7 @@ document.addEventListener('input', e=>{
 });
 document.addEventListener('change', e=>{
   const t=e.target;
-  if (t.matches('[data-slider]')){ state._dragId=null; }
+  if (t.matches('[data-slider]')){ state._dragId=null; MIX_AL.dragging=false; scheduleBannerHide(); }
   else if (t.matches('[data-pctin]') && state.recipe){ const it=state.recipe.items.find(i=>i.id===t.dataset.pctin); if(!it) return; if (fmt(it.pct)===fmt(+t.value||0)){ t.value=fmt(it.pct); return; } pushHist(); const before=Math.round((+t.value||0)*10)/10; const v=applyPct(t.dataset.pctin, t.value); t.value=fmt(v); const row=t.closest('.irow'); const y0=row?row.getBoundingClientRect().top:0; patchMix(); if(row){ const dy=row.getBoundingClientRect().top-y0; if (Math.abs(dy)>0.5) window.scrollBy(0, dy); } if (before>v+0.001) toast(`합계 100%를 넘지 않게 ${fmt(v)}%까지만 넣었어요.`); }
   else if (t.matches('#diyDetails')){ state.diyOpen=t.open; }
   if (t.id==='autoBal' && state.recipe){ state.recipe.auto=t.checked; balance(state.recipe); patchMix(); }
